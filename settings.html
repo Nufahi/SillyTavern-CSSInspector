@@ -1,0 +1,82 @@
+<div class="css-class-inspector-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>CSS Class Inspector</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <div class="flex-container">
+                <input id="css_inspector_enabled" type="checkbox" />
+                <label for="css_inspector_enabled">
+                    <i class="fa-solid fa-eye"></i> <span>Show Inspector</span>
+                </label>
+            </div>
+            <hr>
+            <label for="css_inspector_theme">
+                <i class="fa-solid fa-circle-half-stroke"></i> <span>Tooltip Theme</span>
+            </label>
+            <select id="css_inspector_theme" class="text_pole">
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+            </select>
+            <hr>
+            <label for="css_inspector_copy_mode">
+                <i class="fa-solid fa-copy"></i> <span>Copy Mode</span>
+            </label>
+            <select id="css_inspector_copy_mode" class="text_pole">
+                <option value="full">Full selector (tag#id.class)</option>
+                <option value="classes">Classes only (.class.class)</option>
+                <option value="id">ID only (#id)</option>
+                <option value="path">Full DOM path</option>
+                <option value="css">CSS rule block</option>
+            </select>
+            <hr>
+            <div class="flex-container">
+                <input id="css_inspector_show_dimensions" type="checkbox" />
+                <label for="css_inspector_show_dimensions">
+                    <i class="fa-solid fa-ruler-combined"></i> <span>Show Dimensions</span>
+                </label>
+            </div>
+            <div class="flex-container">
+                <input id="css_inspector_show_computed" type="checkbox" />
+                <label for="css_inspector_show_computed">
+                    <i class="fa-solid fa-palette"></i> <span>Show Computed Styles</span>
+                </label>
+            </div>
+            <div class="flex-container">
+                <input id="css_inspector_show_vars" type="checkbox" />
+                <label for="css_inspector_show_vars">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Show CSS Variables</span>
+                </label>
+            </div>
+            <div class="flex-container">
+                <input id="css_inspector_show_boxmodel" type="checkbox" />
+                <label for="css_inspector_show_boxmodel">
+                    <i class="fa-solid fa-vector-square"></i> <span>Show Box Model</span>
+                </label>
+            </div>
+            <div class="flex-container">
+                <input id="css_inspector_click_lock" type="checkbox" />
+                <label for="css_inspector_click_lock">
+                    <i class="fa-solid fa-thumbtack"></i> <span>Click to Pin Tooltip</span>
+                </label>
+            </div>
+            <div class="flex-container">
+                <input id="css_inspector_show_toasts" type="checkbox" />
+                <label for="css_inspector_show_toasts">
+                    <i class="fa-solid fa-bell"></i> <span>Show Notifications</span>
+                </label>
+            </div>
+            <hr>
+            <div id="css_inspector_reset_pos" class="menu_button menu_button_icon">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                <span>Reset Button Position</span>
+            </div>
+            <hr>
+            <small>
+                <i class="fa-solid fa-circle-info"></i>
+                Click classes in tooltip to highlight all matching elements.
+            </small>
+        </div>
+    </div>
+</div>
