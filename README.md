@@ -31,8 +31,11 @@ A draggable crosshair button that floats over the UI. Drag it anywhere, click to
 
 <img width="1106" height="667" alt="image_2026-03-23_18-02-01" src="https://github.com/user-attachments/assets/aa6a0ba9-7ac0-4cc8-a885-a83a0fe5c5b1" />
 
-### CSS Variables Detection
-Finds CSS custom properties (`--variable-name`) used on the inspected element and shows their resolved values. Essential for working with SillyTavern themes.
+### Class Highlight Search
+
+Click on any class name inside the tooltip to highlight every element on the page that shares it. A toast notification shows the total count - useful for understanding how widely a class is used across the UI.
+
+<img width="646" height="739" alt="image" src="https://github.com/user-attachments/assets/570b428b-9ede-4049-bda2-2ba15c6fa3c6" />
 
 ### Box Model Overlay
 
