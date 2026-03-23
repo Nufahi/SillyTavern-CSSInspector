@@ -2,7 +2,7 @@
 
 **Read this in other languages:** [Русский](README.ru.md)
 
-A browser-like CSS inspector extension for [SillyTavern](https://github.com/SillyTavern/SillyTavern). Hover over any UI element to instantly see its classes, ID, dimensions, computed styles, CSS variables, and box model -- with one-click copy.
+A browser-like CSS inspector extension for [SillyTavern](https://github.com/SillyTavern/SillyTavern). Hover over any UI element to instantly see its classes, ID, dimensions, computed styles, CSS variables, and box model with one-click copy.
 
 Built for theme developers, extension creators, or anyone who wants to understand how SillyTavern's UI is structured without opening DevTools.
 
@@ -40,9 +40,9 @@ All options are configurable from the Extensions panel:
 - Theme: dark or light tooltip
 - Copy mode selector
 - Toggle: dimensions, computed styles, CSS variables, box model
-- Click Lock -- pin tooltip before copying (prevents accidental copies)
-- Toast notifications -- show or hide copy confirmations
-- Reset Position -- snap the FAB back to its default location
+- Click Lock - pin tooltip before copying (prevents accidental copies)
+- Toast notifications - show or hide copy confirmations
+- Reset Position - snap the FAB back to its default location
 
 ---
 
