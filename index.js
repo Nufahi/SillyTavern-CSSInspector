@@ -20,8 +20,10 @@ jQuery(async function() {
         });
 
         function getSettings() {
-            extensionSettings[MODULE_NAME] = SillyTavern.libs.lodash.merge(
-                structuredClone(defaultSettings),
+            var _lodash = (SillyTavern.libs && SillyTavern.libs.lodash) ? SillyTavern.libs.lodash : null;
+            var _merge = _lodash ? _lodash.merge : function(a, b) { return Object.assign({}, a, b || {}); };
+            extensionSettings[MODULE_NAME] = _merge(
+                JSON.parse(JSON.stringify(defaultSettings)),
                 extensionSettings[MODULE_NAME]
             );
             return extensionSettings[MODULE_NAME];
@@ -791,6 +793,6 @@ jQuery(async function() {
         loadSettingsUI();
 
     } catch (error) {
-        if (typeof toastr !== 'undefined') toastr.error('CRASH: ' + error.message, MODULE_NAME);
+        if (typeof toastr !== 'undefined') toastr.error('CRASH: ' + (error && error.message ? error.message : String(error)), MODULE_NAME); console.error('[CSS Inspector] CRASH:', error);
     }
 });
