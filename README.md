@@ -10,6 +10,8 @@ Built for theme developers, extension creators, or anyone who wants to understan
 
 ## Features
 
+<img width="1920" height="1080" alt="image_2026-03-23_18-02-16" src="https://github.com/user-attachments/assets/f420c198-c20b-480d-8e28-fb58fbcd2da6" />
+
 ### Floating Inspector Button (FAB)
 A draggable crosshair button that floats over the UI. Drag it anywhere, click to toggle inspection mode on and off.
 
@@ -27,13 +29,21 @@ A draggable crosshair button that floats over the UI. Drag it anywhere, click to
 | DOM Path | full path from root | `div#sheld > div.flexGap5 > div` |
 | CSS Rule Block | ready-to-paste CSS | `div#chat { color: ...; }` |
 
+<img width="1106" height="667" alt="image_2026-03-23_18-02-01" src="https://github.com/user-attachments/assets/aa6a0ba9-7ac0-4cc8-a885-a83a0fe5c5b1" />
+
 ### CSS Variables Detection
 Finds CSS custom properties (`--variable-name`) used on the inspected element and shows their resolved values. Essential for working with SillyTavern themes.
 
 ### Box Model Overlay
+
+<img width="783" height="730" alt="image_2026-03-23_18-02-09" src="https://github.com/user-attachments/assets/938ac8cb-57d3-46f3-8276-30d7af70a35c" />
+
 Visual margin (blue) and padding (green) overlays rendered directly on the page, similar to Chrome DevTools.
 
 ### Settings Panel
+
+<img width="408" height="560" alt="image_2026-03-23_17-58-00 (2)" src="https://github.com/user-attachments/assets/c2a9a163-2cd7-4c64-b07b-b68a417cfcdc" />
+
 All options are configurable from the Extensions panel:
 
 - Enable / Disable the inspector
