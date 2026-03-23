@@ -1,0 +1,12 @@
+{
+    "display_name": "CSS Class Inspector",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Nufahi",
+    "version": "1.0.0",
+    "homePage": "https://github.com/Nufahi/SillyTavern-CSSInspector",
+    "auto_update": true
+}
