@@ -306,7 +306,7 @@ jQuery(async function() {
         function hideFab() { fab.addClass('csi-fab-hidden'); setInspectorActive(false); }
 
         // === FAB DRAG ===
-        var isDragging = false, dragOff = {x:0,y:0}, hasMoved = false;
+        var isDragging = false, dragOff = {x:0,y:0}, hasMoved = false, touchHandled = false;
 
         fab.on('mousedown', function(e) {
             e.stopImmediatePropagation(); e.preventDefault();
@@ -349,12 +349,13 @@ jQuery(async function() {
         fab[0].addEventListener('touchend', function(e) {
             if(!isDragging)return;
             isDragging=false; fab.removeClass('csi-fab-dragging');
-            if(!hasMoved) setInspectorActive(!inspectorActive);
+            if(!hasMoved) { touchHandled=true; setInspectorActive(!inspectorActive); }
         }, {passive:true});
 
         // FAB mouse click
         fab.on('click', function(e) {
             e.stopImmediatePropagation(); e.preventDefault();
+            if(touchHandled){touchHandled=false;return;}
             if(hasMoved)return;
             setInspectorActive(!inspectorActive);
         });
