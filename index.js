@@ -1,4 +1,4 @@
-const MODULE_NAME = 'css-class-inspector';
+const MODULE_NAME = 'SillyTavern-CSSInspector';
 const extPath = 'scripts/extensions/third-party/' + MODULE_NAME;
 
 jQuery(async function() {
