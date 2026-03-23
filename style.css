@@ -1,0 +1,264 @@
+/* --- Highlight --- */
+.css-inspector-highlight {
+    outline: 2px solid #5c9aff !important;
+    outline-offset: -1px;
+    background-color: rgba(92, 154, 255, 0.08) !important;
+    transition: outline 0.1s ease;
+}
+
+/* --- Highlight All Matching --- */
+.csi-highlight-match {
+    outline: 2px dashed #f0a030 !important;
+    outline-offset: -1px;
+    background-color: rgba(240, 160, 48, 0.12) !important;
+}
+
+/* --- Box Model Overlays --- */
+.csi-box-margin {
+    position: absolute;
+    z-index: 99990;
+    background: rgba(240, 160, 48, 0.25);
+    pointer-events: none;
+}
+
+.csi-box-padding {
+    position: absolute;
+    z-index: 99991;
+    background: rgba(100, 200, 100, 0.25);
+    pointer-events: none;
+}
+
+/* ======================== */
+/* --- DARK THEME (default) */
+/* ======================== */
+#css_inspector_tooltip {
+    display: none;
+    position: absolute;
+    z-index: 99999;
+    background: #141414;
+    color: #d4d4d4;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: 'Consolas', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    max-width: 460px;
+    pointer-events: none;
+    word-break: break-all;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+#css_inspector_tooltip .csi-icon { color: #5c9aff; }
+#css_inspector_tooltip .csi-tag { color: #5c9aff; font-weight: bold; }
+#css_inspector_tooltip .csi-id { color: #e8ab6a; margin-left: 4px; }
+#css_inspector_tooltip .csi-class { color: #7ec699; cursor: pointer; }
+#css_inspector_tooltip .csi-class:hover { text-decoration: underline; color: #a5f0c5; }
+#css_inspector_tooltip .csi-dim { color: #777; font-size: 11px; }
+#css_inspector_tooltip .csi-hint {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #2a2a2a;
+    color: #555;
+    font-size: 10px;
+    text-align: center;
+}
+
+#css_inspector_tooltip .csi-var-name { color: #c792ea; }
+#css_inspector_tooltip .csi-var-value { color: #999; }
+#css_inspector_tooltip .csi-var-prop { color: #5c9aff; }
+#css_inspector_tooltip .csi-vars-title {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #2a2a2a;
+    color: #c792ea;
+    font-size: 10px;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+#css_inspector_tooltip .csi-boxmodel-title {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #2a2a2a;
+    color: #5c9aff;
+    font-size: 10px;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+#css_inspector_tooltip .csi-box-label-margin { color: #f0a030; }
+#css_inspector_tooltip .csi-box-label-padding { color: #64c864; }
+#css_inspector_tooltip .csi-box-label-border { color: #5c9aff; }
+
+#css_inspector_tooltip.csi-pinned {
+    pointer-events: auto;
+    border-color: #7c6dff;
+    box-shadow: 0 0 8px rgba(124, 109, 255, 0.35);
+}
+
+/* ======================== */
+/* --- LIGHT THEME         */
+/* ======================== */
+#css_inspector_tooltip.csi-theme-light {
+    background: #f5f5f5;
+    color: #222;
+    border-color: #ccc;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+#css_inspector_tooltip.csi-theme-light .csi-icon { color: #2563eb; }
+#css_inspector_tooltip.csi-theme-light .csi-tag { color: #2563eb; }
+#css_inspector_tooltip.csi-theme-light .csi-id { color: #b45309; }
+#css_inspector_tooltip.csi-theme-light .csi-class { color: #16803c; }
+#css_inspector_tooltip.csi-theme-light .csi-class:hover { color: #22c55e; }
+#css_inspector_tooltip.csi-theme-light .csi-dim { color: #888; }
+#css_inspector_tooltip.csi-theme-light .csi-hint {
+    border-top-color: #ddd;
+    color: #aaa;
+}
+
+#css_inspector_tooltip.csi-theme-light .csi-var-name { color: #7c3aed; }
+#css_inspector_tooltip.csi-theme-light .csi-var-value { color: #666; }
+#css_inspector_tooltip.csi-theme-light .csi-var-prop { color: #2563eb; }
+#css_inspector_tooltip.csi-theme-light .csi-vars-title {
+    border-top-color: #ddd;
+    color: #7c3aed;
+}
+
+#css_inspector_tooltip.csi-theme-light .csi-boxmodel-title {
+    border-top-color: #ddd;
+    color: #2563eb;
+}
+
+#css_inspector_tooltip.csi-theme-light.csi-pinned {
+    border-color: #6d5cff;
+    box-shadow: 0 0 8px rgba(109, 92, 255, 0.25);
+}
+
+/* ======================== */
+/* --- SHARED LAYOUT       */
+/* ======================== */
+.csi-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 2px 0;
+}
+
+.csi-icon {
+    width: 14px;
+    text-align: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.csi-classes {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.csi-var-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 1px 0;
+    font-size: 11px;
+}
+
+.csi-box-row {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    padding: 1px 0;
+}
+
+/* ======================== */
+/* --- FAB (HIDDEN)        */
+/* ======================== */
+#css_inspector_fab {
+    display: flex;
+    position: fixed;
+    top: 180px;
+    right: 15px;
+    z-index: 99998;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #141414;
+    border: 2px solid #333;
+    color: #d4d4d4;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    cursor: grab;
+    opacity: 0.7;
+    transition: opacity 0.2s, border-color 0.2s, box-shadow 0.2s;
+    user-select: none;
+}
+
+#css_inspector_fab.csi-fab-hidden {
+    display: none !important;
+}
+
+#css_inspector_fab:hover {
+    opacity: 1;
+    border-color: #888;
+}
+
+#css_inspector_fab.csi-fab-active {
+    opacity: 1;
+    color: #5c9aff;
+    border-color: #5c9aff;
+    box-shadow: 0 0 8px rgba(92, 154, 255, 0.3);
+}
+
+#css_inspector_fab.csi-fab-dragging {
+    cursor: grabbing;
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* FAB light theme */
+#css_inspector_fab.csi-fab-light {
+    background: #f5f5f5;
+    border-color: #ccc;
+    color: #333;
+}
+
+#css_inspector_fab.csi-fab-light:hover {
+    border-color: #999;
+}
+
+#css_inspector_fab.csi-fab-light.csi-fab-active {
+    color: #2563eb;
+    border-color: #2563eb;
+    box-shadow: 0 0 8px rgba(37, 99, 235, 0.25);
+}
+
+/* ======================== */
+/* --- TOUCH / MOBILE      */
+/* ======================== */
+@media (pointer: coarse), (max-width: 768px) {
+    #css_inspector_fab {
+        width: 52px;
+        height: 52px;
+        font-size: 22px;
+        z-index: 999999;
+    }
+
+    #css_inspector_tooltip {
+        font-size: 13px;
+        max-width: 90vw;
+        padding: 12px 16px;
+        z-index: 999999;
+    }
+
+    #css_inspector_tooltip .csi-class {
+        padding: 2px 4px;
+        display: inline-block;
+    }
+}
