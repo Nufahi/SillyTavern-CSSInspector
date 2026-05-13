@@ -1,3 +1,12 @@
+/* --- Visual indicator: inspector active --- */
+body.csi-inspector-active {
+    cursor: crosshair !important;
+}
+
+body.csi-inspector-active * {
+    cursor: crosshair !important;
+}
+
 /* --- Highlight --- */
 .css-inspector-highlight {
     outline: 2px solid #5c9aff !important;

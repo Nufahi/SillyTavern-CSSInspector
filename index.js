@@ -1,13 +1,22 @@
 const MODULE_NAME = 'SillyTavern-CSSInspector';
 const extPath = 'scripts/extensions/third-party/' + MODULE_NAME;
 
-jQuery(async function() {
+jQuery(async function () {
     try {
-        var context = SillyTavern.getContext();
-        var extensionSettings = context.extensionSettings;
-        var saveSettingsDebounced = context.saveSettingsDebounced;
+        // --- Prevent double initialization (Bug #2) ---
+        if (window.__cssInspectorInitialized) {
+            console.warn('[CSS Inspector] Already initialized, cleaning up previous instance.');
+            if (typeof window.__cssInspectorDispose === 'function') {
+                try { window.__cssInspectorDispose(); } catch (e) { console.error('[CSS Inspector] Dispose error:', e); }
+            }
+        }
+        window.__cssInspectorInitialized = true;
 
-        var defaultSettings = {
+        const context = SillyTavern.getContext();
+        const extensionSettings = context.extensionSettings;
+        const saveSettingsDebounced = context.saveSettingsDebounced;
+
+        const defaultSettings = {
             enabled: false,
             theme: 'dark',
             copyMode: 'full',
@@ -17,107 +26,174 @@ jQuery(async function() {
             showBoxModel: false,
             clickLock: true,
             showToasts: true,
+            fabPosition: null, // {left, top} or null
         };
 
-        function deepMerge(target, source) {
-            if (!source) return target;
-            var result = {};
-            for (var key in target) {
-                if (target.hasOwnProperty(key)) {
-                    result[key] = (source.hasOwnProperty(key)) ? source[key] : target[key];
+        // --- Fixed deepMerge: preserves all keys from source AND target (Bug #1) ---
+        function mergeSettings(defaults, saved) {
+            const result = {};
+            // Start with defaults to ensure every default key exists
+            for (const key in defaults) {
+                if (Object.prototype.hasOwnProperty.call(defaults, key)) {
+                    result[key] = defaults[key];
+                }
+            }
+            // Override with saved (and keep any extra saved keys for forward-compat)
+            if (saved && typeof saved === 'object') {
+                for (const key in saved) {
+                    if (Object.prototype.hasOwnProperty.call(saved, key)) {
+                        result[key] = saved[key];
+                    }
                 }
             }
             return result;
         }
 
         function getSettings() {
-            extensionSettings[MODULE_NAME] = deepMerge(defaultSettings, extensionSettings[MODULE_NAME]);
+            extensionSettings[MODULE_NAME] = mergeSettings(defaultSettings, extensionSettings[MODULE_NAME]);
             return extensionSettings[MODULE_NAME];
         }
 
-        var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        // --- HTML escaping (Bug #27 - XSS) ---
+        function escapeHtml(str) {
+            if (str == null) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+        // --- Cleanup any leftover DOM from previous instance ---
+        $('#css_inspector_tooltip, #css_inspector_fab, .csi-box-margin, .csi-box-padding').remove();
+        $('.css-inspector-highlight').removeClass('css-inspector-highlight');
+        $('.csi-highlight-match').removeClass('csi-highlight-match');
 
         // --- Core DOM elements ---
-        var tooltip = $('<div id="css_inspector_tooltip"></div>');
+        const tooltip = $('<div id="css_inspector_tooltip"></div>');
         $('body').append(tooltip);
 
-        var fab = $('<div id="css_inspector_fab" title="CSS Inspector"><i class="fa-solid fa-crosshairs"></i></div>');
+        const fab = $('<div id="css_inspector_fab" title="CSS Inspector"><i class="fa-solid fa-crosshairs"></i></div>');
         $('body').append(fab);
 
         // --- Box model overlays ---
-        var boxMarginEls = [], boxPaddingEls = [];
-        for (var bi = 0; bi < 4; bi++) {
-            var bm = $('<div class="csi-box-margin"></div>');
-            var bp = $('<div class="csi-box-padding"></div>');
+        const boxMarginEls = [];
+        const boxPaddingEls = [];
+        for (let bi = 0; bi < 4; bi++) {
+            const bm = $('<div class="csi-box-margin"></div>');
+            const bp = $('<div class="csi-box-padding"></div>');
             $('body').append(bm).append(bp);
             boxMarginEls.push(bm);
             boxPaddingEls.push(bp);
         }
 
         function hideBoxOverlays() {
-            for (var i = 0; i < 4; i++) { boxMarginEls[i].hide(); boxPaddingEls[i].hide(); }
+            for (let i = 0; i < 4; i++) {
+                boxMarginEls[i].hide();
+                boxPaddingEls[i].hide();
+            }
         }
         hideBoxOverlays();
 
         function showBoxModel(el) {
-            var cs = getComputedStyle(el), rect = el.getBoundingClientRect();
-            var sx = window.scrollX, sy = window.scrollY;
-            var mt = parseFloat(cs.marginTop)||0, mr = parseFloat(cs.marginRight)||0;
-            var mb = parseFloat(cs.marginBottom)||0, ml = parseFloat(cs.marginLeft)||0;
-            var pt = parseFloat(cs.paddingTop)||0, pr = parseFloat(cs.paddingRight)||0;
-            var pb = parseFloat(cs.paddingBottom)||0, pl = parseFloat(cs.paddingLeft)||0;
-            var bt = parseFloat(cs.borderTopWidth)||0, brw = parseFloat(cs.borderRightWidth)||0;
-            var bb = parseFloat(cs.borderBottomWidth)||0, blw = parseFloat(cs.borderLeftWidth)||0;
+            const cs = getComputedStyle(el);
+            const rect = el.getBoundingClientRect();
+            const sx = window.scrollX, sy = window.scrollY;
+            const mt = parseFloat(cs.marginTop) || 0;
+            const mr = parseFloat(cs.marginRight) || 0;
+            const mb = parseFloat(cs.marginBottom) || 0;
+            const ml = parseFloat(cs.marginLeft) || 0;
+            const pt = parseFloat(cs.paddingTop) || 0;
+            const pr = parseFloat(cs.paddingRight) || 0;
+            const pb = parseFloat(cs.paddingBottom) || 0;
+            const pl = parseFloat(cs.paddingLeft) || 0;
+            const bt = parseFloat(cs.borderTopWidth) || 0;
+            const brw = parseFloat(cs.borderRightWidth) || 0;
+            const bb = parseFloat(cs.borderBottomWidth) || 0;
+            const blw = parseFloat(cs.borderLeftWidth) || 0;
 
-            boxMarginEls[0].css({left:rect.left+sx-ml,top:rect.top+sy-mt,width:rect.width+ml+mr,height:mt}).show();
-            boxMarginEls[1].css({left:rect.right+sx,top:rect.top+sy,width:mr,height:rect.height}).show();
-            boxMarginEls[2].css({left:rect.left+sx-ml,top:rect.bottom+sy,width:rect.width+ml+mr,height:mb}).show();
-            boxMarginEls[3].css({left:rect.left+sx-ml,top:rect.top+sy,width:ml,height:rect.height}).show();
+            boxMarginEls[0].css({ left: rect.left + sx - ml, top: rect.top + sy - mt, width: rect.width + ml + mr, height: mt }).show();
+            boxMarginEls[1].css({ left: rect.right + sx, top: rect.top + sy, width: mr, height: rect.height }).show();
+            boxMarginEls[2].css({ left: rect.left + sx - ml, top: rect.bottom + sy, width: rect.width + ml + mr, height: mb }).show();
+            boxMarginEls[3].css({ left: rect.left + sx - ml, top: rect.top + sy, width: ml, height: rect.height }).show();
 
-            var il=rect.left+sx+blw, it=rect.top+sy+bt, iw=rect.width-blw-brw, ih=rect.height-bt-bb;
-            boxPaddingEls[0].css({left:il,top:it,width:iw,height:pt}).show();
-            boxPaddingEls[1].css({left:il+iw-pr,top:it+pt,width:pr,height:ih-pt-pb}).show();
-            boxPaddingEls[2].css({left:il,top:it+ih-pb,width:iw,height:pb}).show();
-            boxPaddingEls[3].css({left:il,top:it+pt,width:pl,height:ih-pt-pb}).show();
+            // Bug #9: clamp to non-negative dimensions
+            const il = rect.left + sx + blw;
+            const it = rect.top + sy + bt;
+            const iw = Math.max(0, rect.width - blw - brw);
+            const ih = Math.max(0, rect.height - bt - bb);
+            const safePt = Math.min(pt, ih);
+            const safePb = Math.min(pb, Math.max(0, ih - safePt));
+            const verticalRem = Math.max(0, ih - safePt - safePb);
+            const safePl = Math.min(pl, iw);
+            const safePr = Math.min(pr, Math.max(0, iw - safePl));
+
+            boxPaddingEls[0].css({ left: il, top: it, width: iw, height: safePt }).show();
+            boxPaddingEls[1].css({ left: il + iw - safePr, top: it + safePt, width: safePr, height: verticalRem }).show();
+            boxPaddingEls[2].css({ left: il, top: it + ih - safePb, width: iw, height: safePb }).show();
+            boxPaddingEls[3].css({ left: il, top: it + safePt, width: safePl, height: verticalRem }).show();
         }
 
         // --- Theme ---
         function applyTheme() {
-            var s = getSettings();
+            const s = getSettings();
             tooltip.toggleClass('csi-theme-light', s.theme === 'light');
             fab.toggleClass('csi-fab-light', s.theme === 'light');
         }
 
-        // --- CSS Variables ---
-        function getMatchingRules(el) {
-            var matched = [];
-            try {
-                for (var s = 0; s < document.styleSheets.length; s++) {
-                    var rules;
-                    try { rules = document.styleSheets[s].cssRules; } catch(e) { continue; }
-                    if (!rules) continue;
-                    for (var r = 0; r < rules.length; r++) {
-                        if (!rules[r].selectorText) continue;
-                        try { if (el.matches(rules[r].selectorText)) matched.push(rules[r]); } catch(e) {}
-                    }
+        // --- CSS Variables (Bug #4: handles nested rules) ---
+        function collectRulesRecursive(rulesList, el, out) {
+            if (!rulesList) return;
+            for (let r = 0; r < rulesList.length; r++) {
+                const rule = rulesList[r];
+                if (!rule) continue;
+                // Style rule
+                if (rule.selectorText) {
+                    try {
+                        if (el.matches(rule.selectorText)) out.push(rule);
+                    } catch (e) { /* invalid selector */ }
                 }
-            } catch(e) {}
+                // Group rules: @media, @supports, @layer, @container, @document
+                if (rule.cssRules) {
+                    try { collectRulesRecursive(rule.cssRules, el, out); } catch (e) { /* cross-origin */ }
+                }
+            }
+        }
+
+        function getMatchingRules(el) {
+            const matched = [];
+            try {
+                for (let s = 0; s < document.styleSheets.length; s++) {
+                    let rules;
+                    try { rules = document.styleSheets[s].cssRules; } catch (e) { continue; }
+                    collectRulesRecursive(rules, el, matched);
+                }
+            } catch (e) { /* noop */ }
             return matched;
         }
 
         function extractCssVariables(el) {
-            var varMap = {}, rules = getMatchingRules(el);
-            var re = /var\(\s*(--.+?)\s*(?:,|\))/g;
-            for (var i = 0; i < rules.length; i++) {
-                var st = rules[i].style;
-                for (var p = 0; p < st.length; p++) {
-                    var val = st.getPropertyValue(st[p]), m;
+            const varMap = {};
+            const rules = getMatchingRules(el);
+            const re = /var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)/g;
+            const elComputed = getComputedStyle(el);
+            for (let i = 0; i < rules.length; i++) {
+                const st = rules[i].style;
+                if (!st) continue;
+                for (let p = 0; p < st.length; p++) {
+                    const propName = st[p];
+                    const val = st.getPropertyValue(propName);
+                    let m;
                     re.lastIndex = 0;
                     while ((m = re.exec(val)) !== null) {
-                        var vn = m[1].trim();
+                        const vn = m[1].trim();
                         if (!varMap[vn]) {
-                            var rv = getComputedStyle(document.documentElement).getPropertyValue(vn).trim();
-                            varMap[vn] = { property: st[p], resolved: rv || '(unset)' };
+                            // Bug #17: resolve from element's computed style (respects inheritance)
+                            const rv = elComputed.getPropertyValue(vn).trim();
+                            varMap[vn] = { property: propName, resolved: rv || '(unset)' };
                         }
                     }
                 }
@@ -125,47 +201,79 @@ jQuery(async function() {
             return varMap;
         }
 
-        // --- Highlight matching ---
-        var matchHighlighted = [];
+        // --- Highlight matching (Bug #20: WeakSet for auto-GC) ---
+        let matchHighlighted = [];
         function clearMatchHighlights() {
-            matchHighlighted.forEach(function(e) { e.classList.remove('csi-highlight-match'); });
+            for (let i = 0; i < matchHighlighted.length; i++) {
+                const el = matchHighlighted[i];
+                if (el && el.classList && el.isConnected) {
+                    el.classList.remove('csi-highlight-match');
+                }
+            }
             matchHighlighted = [];
         }
         function highlightAllWithClass(cn) {
             clearMatchHighlights();
-            var els = document.querySelectorAll('.' + cn), count = 0;
-            for (var i = 0; i < els.length; i++) {
-                if (!isInspectorEl(els[i])) { els[i].classList.add('csi-highlight-match'); matchHighlighted.push(els[i]); count++; }
+            // Sanitize class name for selector
+            let escapedCn;
+            try {
+                escapedCn = (window.CSS && CSS.escape) ? CSS.escape(cn) : cn.replace(/([^\w-])/g, '\\$1');
+            } catch (e) { escapedCn = cn; }
+            let els;
+            try { els = document.querySelectorAll('.' + escapedCn); } catch (e) { return; }
+            let count = 0;
+            for (let i = 0; i < els.length; i++) {
+                if (!isInspectorEl(els[i])) {
+                    els[i].classList.add('csi-highlight-match');
+                    matchHighlighted.push(els[i]);
+                    count++;
+                }
             }
-            if (getSettings().showToasts) toastr.info(count + ' elements with .' + cn, MODULE_NAME);
+            if (getSettings().showToasts && typeof toastr !== 'undefined') {
+                toastr.info(count + ' elements with .' + cn, MODULE_NAME);
+            }
         }
 
         // --- State ---
-        var lastEl = null, isPinned = false, inspectorActive = false;
+        let lastEl = null;
+        let isPinned = false;
+        let inspectorActive = false;
 
+        // Bug #13: include box overlays. Bug #15: handle null.
         function isInspectorEl(el) {
-            if (!el) return true;
-            return el.id === 'css_inspector_tooltip' || el.id === 'css_inspector_fab'
-                || !!el.closest('#css_inspector_tooltip') || !!el.closest('#css_inspector_fab');
+            if (!el) return false; // null/undefined: not an inspector element (Bug #15 fix)
+            if (!(el instanceof Element)) return false;
+            if (el.id === 'css_inspector_tooltip' || el.id === 'css_inspector_fab') return true;
+            if (el.classList && (el.classList.contains('csi-box-margin') || el.classList.contains('csi-box-padding'))) return true;
+            try {
+                if (el.closest && (el.closest('#css_inspector_tooltip') || el.closest('#css_inspector_fab'))) return true;
+            } catch (e) { /* noop */ }
+            return false;
         }
 
         function clearHighlight() {
-            if (lastEl) { lastEl.classList.remove('css-inspector-highlight'); lastEl = null; }
-            tooltip.hide(); hideBoxOverlays(); clearMatchHighlights();
+            if (lastEl && lastEl.classList) {
+                lastEl.classList.remove('css-inspector-highlight');
+            }
+            lastEl = null;
+            tooltip.hide();
+            hideBoxOverlays();
+            clearMatchHighlights();
         }
 
-        // --- Tooltip content ---
+        // --- Tooltip content (Bug #27: XSS-safe via escapeHtml) ---
         function buildTooltip(el) {
-            var s = getSettings(), tag = el.tagName.toLowerCase();
-            var id = el.id ? '<span class="csi-id">#' + el.id + '</span>' : '';
-            var fc = el.classList ? Array.from(el.classList).filter(function(c) {
+            const s = getSettings();
+            const tag = el.tagName ? el.tagName.toLowerCase() : '?';
+            const idStr = el.id ? '<span class="csi-id">#' + escapeHtml(el.id) + '</span>' : '';
+            const fc = el.classList ? Array.from(el.classList).filter(function (c) {
                 return c !== 'css-inspector-highlight' && c !== 'csi-highlight-match';
             }) : [];
-            var cls = fc.map(function(c) {
-                return '<span class="csi-class" data-classname="' + c + '">.' + c + '</span>';
+            const cls = fc.map(function (c) {
+                return '<span class="csi-class" data-classname="' + escapeHtml(c) + '">.' + escapeHtml(c) + '</span>';
             });
 
-            var h = '<div class="csi-row"><i class="fa-solid fa-code csi-icon"></i><span class="csi-tag">&lt;' + tag + '&gt;</span>' + id + '</div>';
+            let h = '<div class="csi-row"><i class="fa-solid fa-code csi-icon"></i><span class="csi-tag">&lt;' + escapeHtml(tag) + '&gt;</span>' + idStr + '</div>';
 
             if (cls.length) {
                 h += '<div class="csi-row"><i class="fa-solid fa-layer-group csi-icon"></i><div class="csi-classes">' + cls.join('<br>') + '</div></div>';
@@ -174,243 +282,465 @@ jQuery(async function() {
             }
 
             if (s.showDimensions) {
-                var r = el.getBoundingClientRect();
+                const r = el.getBoundingClientRect();
                 h += '<div class="csi-row csi-dim"><i class="fa-solid fa-ruler-combined csi-icon"></i> ' + Math.round(r.width) + ' x ' + Math.round(r.height) + 'px</div>';
             }
 
             if (s.showComputed) {
-                var cs = getComputedStyle(el);
-                h += '<div class="csi-row csi-dim"><i class="fa-solid fa-palette csi-icon"></i> color: ' + cs.color + '</div>';
-                h += '<div class="csi-row csi-dim"><i class="fa-solid fa-font csi-icon"></i> ' + cs.fontFamily.split(',')[0] + ' / ' + cs.fontSize + '</div>';
+                const cs = getComputedStyle(el);
+                h += '<div class="csi-row csi-dim"><i class="fa-solid fa-palette csi-icon"></i> color: ' + escapeHtml(cs.color) + '</div>';
+                h += '<div class="csi-row csi-dim"><i class="fa-solid fa-font csi-icon"></i> ' + escapeHtml(cs.fontFamily.split(',')[0]) + ' / ' + escapeHtml(cs.fontSize) + '</div>';
                 if (cs.backgroundColor !== 'rgba(0, 0, 0, 0)') {
-                    h += '<div class="csi-row csi-dim"><i class="fa-solid fa-fill-drip csi-icon"></i> bg: ' + cs.backgroundColor + '</div>';
+                    h += '<div class="csi-row csi-dim"><i class="fa-solid fa-fill-drip csi-icon"></i> bg: ' + escapeHtml(cs.backgroundColor) + '</div>';
                 }
             }
 
             if (s.showBoxModel) {
-                var bcs = getComputedStyle(el);
+                const bcs = getComputedStyle(el);
                 h += '<div class="csi-boxmodel-title"><i class="fa-solid fa-vector-square"></i> Box Model</div>';
-                h += '<div class="csi-box-row"><span class="csi-box-label-margin">margin: ' + bcs.margin + '</span></div>';
-                h += '<div class="csi-box-row"><span class="csi-box-label-padding">padding: ' + bcs.padding + '</span></div>';
-                h += '<div class="csi-box-row"><span class="csi-box-label-border">border: ' + bcs.borderWidth + '</span></div>';
+                h += '<div class="csi-box-row"><span class="csi-box-label-margin">margin: ' + escapeHtml(bcs.margin) + '</span></div>';
+                h += '<div class="csi-box-row"><span class="csi-box-label-padding">padding: ' + escapeHtml(bcs.padding) + '</span></div>';
+                h += '<div class="csi-box-row"><span class="csi-box-label-border">border: ' + escapeHtml(bcs.borderWidth) + '</span></div>';
             }
 
             if (s.showVariables) {
-                var vars = extractCssVariables(el), vk = Object.keys(vars);
+                const vars = extractCssVariables(el);
+                const vk = Object.keys(vars);
                 if (vk.length) {
                     h += '<div class="csi-vars-title"><i class="fa-solid fa-wand-magic-sparkles"></i> CSS Variables</div>';
-                    vk.forEach(function(k) {
-                        h += '<div class="csi-var-row"><span class="csi-var-prop">' + vars[k].property + '</span> <span class="csi-var-name">' + k + '</span> <span class="csi-var-value">' + vars[k].resolved + '</span></div>';
+                    vk.forEach(function (k) {
+                        h += '<div class="csi-var-row"><span class="csi-var-prop">' + escapeHtml(vars[k].property) + '</span> <span class="csi-var-name">' + escapeHtml(k) + '</span> <span class="csi-var-value">' + escapeHtml(vars[k].resolved) + '</span></div>';
                     });
                 }
             }
 
-            var ml = {full:'tag#id.class',classes:'.class only',id:'#id only',path:'DOM path',css:'CSS rule block'};
-            var hint = isTouchDevice ? 'tap again to copy' : 'click to copy';
-            h += '<div class="csi-hint"><i class="fa-solid fa-copy"></i> ' + hint + ' (' + (ml[s.copyMode]||s.copyMode) + ')</div>';
+            const ml = { full: 'tag#id.class', classes: '.class only', id: '#id only', path: 'DOM path', css: 'CSS rule block' };
+            const hint = isTouchDevice ? 'tap again to copy' : 'click to copy';
+            h += '<div class="csi-hint"><i class="fa-solid fa-copy"></i> ' + hint + ' (' + escapeHtml(ml[s.copyMode] || s.copyMode) + ')</div>';
             return h;
         }
 
-        tooltip.on('click', '.csi-class', function(e) {
+        tooltip.on('click', '.csi-class', function (e) {
             e.stopPropagation();
-            var cn = $(this).attr('data-classname');
+            const cn = $(this).attr('data-classname');
             if (cn) highlightAllWithClass(cn);
         });
 
         // --- Copy selectors ---
         function getFullSelector(el) {
-            var t = el.tagName.toLowerCase(), i = el.id ? '#'+el.id : '';
-            var c = el.classList ? Array.from(el.classList).filter(function(x){return x!=='css-inspector-highlight'&&x!=='csi-highlight-match';}).map(function(x){return '.'+x;}).join('') : '';
-            return t+i+c;
+            const t = el.tagName.toLowerCase();
+            const i = el.id ? '#' + el.id : '';
+            const c = el.classList ? Array.from(el.classList).filter(function (x) { return x !== 'css-inspector-highlight' && x !== 'csi-highlight-match'; }).map(function (x) { return '.' + x; }).join('') : '';
+            return t + i + c;
         }
         function getClassesOnly(el) {
-            if (!el.classList||!el.classList.length) return el.tagName.toLowerCase();
-            var c = Array.from(el.classList).filter(function(x){return x!=='css-inspector-highlight'&&x!=='csi-highlight-match';}).map(function(x){return '.'+x;}).join('');
+            if (!el.classList || !el.classList.length) return el.tagName.toLowerCase();
+            const c = Array.from(el.classList).filter(function (x) { return x !== 'css-inspector-highlight' && x !== 'csi-highlight-match'; }).map(function (x) { return '.' + x; }).join('');
             return c || el.tagName.toLowerCase();
         }
-        function getIdOnly(el) { return el.id ? '#'+el.id : getFullSelector(el); }
+        function getIdOnly(el) { return el.id ? '#' + el.id : getFullSelector(el); }
+
+        // Bug #10: nth-of-type for siblings without unique id/class
         function getDomPath(el) {
-            var p=[],c=el;
-            while(c&&c!==document.body&&c!==document.documentElement) {
-                var t=c.tagName.toLowerCase(),i=c.id?'#'+c.id:'',cl='';
-                if(!i&&c.classList&&c.classList.length){var f=Array.from(c.classList).filter(function(x){return x!=='css-inspector-highlight'&&x!=='csi-highlight-match';})[0];if(f)cl='.'+f;}
-                p.unshift(t+i+cl); if(c.id)break; c=c.parentElement;
+            const parts = [];
+            let c = el;
+            while (c && c !== document.body && c !== document.documentElement) {
+                const t = c.tagName.toLowerCase();
+                let segment = t;
+                if (c.id) {
+                    segment = t + '#' + c.id;
+                    parts.unshift(segment);
+                    break;
+                }
+                if (c.classList && c.classList.length) {
+                    const f = Array.from(c.classList).filter(function (x) { return x !== 'css-inspector-highlight' && x !== 'csi-highlight-match'; })[0];
+                    if (f) segment = t + '.' + f;
+                }
+                // Add nth-of-type if needed for disambiguation
+                if (c.parentElement) {
+                    const siblings = Array.from(c.parentElement.children).filter(function (s) { return s.tagName === c.tagName; });
+                    if (siblings.length > 1) {
+                        const idx = siblings.indexOf(c) + 1;
+                        segment += ':nth-of-type(' + idx + ')';
+                    }
+                }
+                parts.unshift(segment);
+                c = c.parentElement;
             }
-            return p.join(' > ');
+            return parts.join(' > ');
         }
+
+        // Bug #11: build CSS block from matched rules + a few key inherited values
         function getCssBlock(el) {
-            var sel=getFullSelector(el),cs=getComputedStyle(el),l=[sel+' {'];
-            if(cs.color)l.push('    color: '+cs.color+';');
-            if(cs.backgroundColor!=='rgba(0, 0, 0, 0)')l.push('    background-color: '+cs.backgroundColor+';');
-            if(cs.fontSize)l.push('    font-size: '+cs.fontSize+';');
-            if(cs.fontFamily)l.push('    font-family: '+cs.fontFamily+';');
-            if(cs.padding!=='0px')l.push('    padding: '+cs.padding+';');
-            if(cs.margin!=='0px')l.push('    margin: '+cs.margin+';');
-            if(cs.borderRadius!=='0px')l.push('    border-radius: '+cs.borderRadius+';');
-            l.push('}'); return l.join('\n');
+            const sel = getFullSelector(el);
+            const props = {};
+            const rules = getMatchingRules(el);
+            for (let i = 0; i < rules.length; i++) {
+                const st = rules[i].style;
+                if (!st) continue;
+                for (let p = 0; p < st.length; p++) {
+                    const name = st[p];
+                    const val = st.getPropertyValue(name);
+                    if (val) props[name] = val;
+                }
+            }
+            const lines = [sel + ' {'];
+            const keys = Object.keys(props).sort();
+            if (keys.length === 0) {
+                // Fallback to a minimal computed snapshot
+                const cs = getComputedStyle(el);
+                if (cs.color) lines.push('    color: ' + cs.color + ';');
+                if (cs.backgroundColor !== 'rgba(0, 0, 0, 0)') lines.push('    background-color: ' + cs.backgroundColor + ';');
+                if (cs.fontSize) lines.push('    font-size: ' + cs.fontSize + ';');
+            } else {
+                for (let k = 0; k < keys.length; k++) {
+                    lines.push('    ' + keys[k] + ': ' + props[keys[k]] + ';');
+                }
+            }
+            lines.push('}');
+            return lines.join('\n');
         }
+
         function buildCopyText(el) {
-            var m=getSettings().copyMode;
-            if(m==='classes')return getClassesOnly(el);if(m==='id')return getIdOnly(el);
-            if(m==='path')return getDomPath(el);if(m==='css')return getCssBlock(el);
+            const m = getSettings().copyMode;
+            if (m === 'classes') return getClassesOnly(el);
+            if (m === 'id') return getIdOnly(el);
+            if (m === 'path') return getDomPath(el);
+            if (m === 'css') return getCssBlock(el);
             return getFullSelector(el);
         }
 
-        function doCopy(el) {
-            var txt = buildCopyText(el);
-            navigator.clipboard.writeText(txt).then(function() {
-                if (getSettings().showToasts) toastr.success('Copied: ' + txt, MODULE_NAME);
+        // Bug #7: error handling + execCommand fallback
+        function copyToClipboard(text) {
+            return new Promise(function (resolve, reject) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(resolve).catch(function (err) {
+                        // Try fallback
+                        if (legacyCopy(text)) resolve(); else reject(err);
+                    });
+                } else {
+                    if (legacyCopy(text)) resolve(); else reject(new Error('Clipboard API unavailable'));
+                }
             });
         }
 
-        // --- Positioning ---
+        function legacyCopy(text) {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.top = '-1000px';
+                ta.style.left = '-1000px';
+                ta.setAttribute('readonly', '');
+                document.body.appendChild(ta);
+                ta.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                return ok;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function doCopy(el) {
+            const txt = buildCopyText(el);
+            copyToClipboard(txt).then(function () {
+                if (getSettings().showToasts && typeof toastr !== 'undefined') {
+                    toastr.success('Copied: ' + txt, MODULE_NAME);
+                }
+            }).catch(function (err) {
+                console.warn('[CSS Inspector] Copy failed:', err);
+                if (getSettings().showToasts && typeof toastr !== 'undefined') {
+                    toastr.error('Copy failed: ' + (err && err.message ? err.message : 'unknown'), MODULE_NAME);
+                }
+            });
+        }
+
+        // --- Positioning (Bug #8: pageX/pageY already include scroll) ---
         function positionTooltip(px, py) {
-            var tw=tooltip.outerWidth(),th=tooltip.outerHeight();
-            var ww=$(window).width(),wh=$(window).height();
-            var sx=window.scrollX,sy=window.scrollY;
-            var l=px+15,t=py+15;
-            if(l+tw>ww+sx)l=px-tw-10; if(l<sx+5)l=sx+5;
-            if(t+th>wh+sy)t=py-th-10; if(t<sy+5)t=sy+5;
-            tooltip.css({left:l,top:t});
+            const tw = tooltip.outerWidth();
+            const th = tooltip.outerHeight();
+            const ww = $(window).width();
+            const wh = $(window).height();
+            const sx = window.scrollX, sy = window.scrollY;
+            // px/py are pageX/pageY (already include scroll)
+            let l = px + 15, t = py + 15;
+            // Right boundary: viewport right edge in page coords = sx + ww
+            if (l + tw > sx + ww) l = px - tw - 10;
+            if (l < sx + 5) l = sx + 5;
+            if (t + th > sy + wh) t = py - th - 10;
+            if (t < sy + 5) t = sy + 5;
+            tooltip.css({ left: l, top: t });
         }
 
         function positionTooltipForEl(el) {
-            var r=el.getBoundingClientRect(),tw=tooltip.outerWidth(),th=tooltip.outerHeight();
-            var ww=$(window).width(),wh=$(window).height();
-            var sx=window.scrollX,sy=window.scrollY;
-            var l=r.left+sx+(r.width/2)-(tw/2), t=r.bottom+sy+10;
-            if(t+th>wh+sy)t=r.top+sy-th-10;
-            if(l<sx+5)l=sx+5; if(l+tw>ww+sx)l=ww+sx-tw-5;
-            if(t<sy+5)t=sy+5;
-            tooltip.css({left:l,top:t});
+            const r = el.getBoundingClientRect();
+            const tw = tooltip.outerWidth();
+            const th = tooltip.outerHeight();
+            const ww = $(window).width();
+            const wh = $(window).height();
+            const sx = window.scrollX, sy = window.scrollY;
+            let l = r.left + sx + (r.width / 2) - (tw / 2);
+            let t = r.bottom + sy + 10;
+            if (t + th > sy + wh) t = r.top + sy - th - 10;
+            if (l < sx + 5) l = sx + 5;
+            if (l + tw > sx + ww) l = sx + ww - tw - 5;
+            if (t < sy + 5) t = sy + 5;
+            tooltip.css({ left: l, top: t });
         }
 
         // --- Inspect element ---
         function inspectElement(el) {
-            var s = getSettings();
-            if (lastEl && lastEl !== el) lastEl.classList.remove('css-inspector-highlight');
+            const s = getSettings();
+            if (lastEl && lastEl !== el && lastEl.classList) {
+                lastEl.classList.remove('css-inspector-highlight');
+            }
             el.classList.add('css-inspector-highlight');
             lastEl = el;
             tooltip.html(buildTooltip(el)).show();
             if (s.showBoxModel) showBoxModel(el); else hideBoxOverlays();
         }
 
+        // --- rAF throttle wrapper (Bug #16) ---
+        function rafThrottle(fn) {
+            let scheduled = false;
+            let lastArgs = null;
+            return function () {
+                lastArgs = arguments;
+                if (scheduled) return;
+                scheduled = true;
+                requestAnimationFrame(function () {
+                    scheduled = false;
+                    fn.apply(null, lastArgs);
+                });
+            };
+        }
+
         // --- FAB ---
         function setInspectorActive(val) {
             inspectorActive = val;
             fab.toggleClass('csi-fab-active', val);
-            if (!val) { isPinned = false; tooltip.removeClass('csi-pinned'); clearHighlight(); }
+            document.body.classList.toggle('csi-inspector-active', val);
+            if (!val) {
+                isPinned = false;
+                tooltip.removeClass('csi-pinned');
+                clearHighlight();
+            }
         }
 
-        function showFab() { fab.removeClass('csi-fab-hidden'); applyTheme(); }
+        function applyFabPosition() {
+            const s = getSettings();
+            if (s.fabPosition && typeof s.fabPosition.left === 'number' && typeof s.fabPosition.top === 'number') {
+                clampFabPosition(s.fabPosition.left, s.fabPosition.top, true);
+            }
+        }
+
+        // Bug #14: clamp to viewport
+        function clampFabPosition(left, top, persist) {
+            const fw = fab.outerWidth() || 42;
+            const fh = fab.outerHeight() || 42;
+            const ww = $(window).width();
+            const wh = $(window).height();
+            const clampedL = Math.max(0, Math.min(left, ww - fw));
+            const clampedT = Math.max(0, Math.min(top, wh - fh));
+            fab.css({ left: clampedL, top: clampedT, right: 'auto', bottom: 'auto' });
+            if (persist) {
+                const s = getSettings();
+                s.fabPosition = { left: clampedL, top: clampedT };
+                saveSettingsDebounced();
+            }
+        }
+
+        function showFab() { fab.removeClass('csi-fab-hidden'); applyTheme(); applyFabPosition(); }
         function hideFab() { fab.addClass('csi-fab-hidden'); setInspectorActive(false); }
 
         // === FAB DRAG ===
-        var isDragging = false, dragOff = {x:0,y:0}, hasMoved = false, touchHandled = false;
+        let isDragging = false;
+        let dragOff = { x: 0, y: 0 };
+        let hasMoved = false;
+        let touchHandled = false;
 
-        fab.on('mousedown', function(e) {
-            e.stopImmediatePropagation(); e.preventDefault();
-            isDragging = true; hasMoved = false;
-            var r = fab[0].getBoundingClientRect();
-            dragOff = {x:e.clientX-r.left, y:e.clientY-r.top};
+        // jQuery namespace for clean removal
+        const NS = '.csi';
+
+        fab.on('mousedown' + NS, function (e) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            isDragging = true;
+            hasMoved = false;
+            const r = fab[0].getBoundingClientRect();
+            dragOff = { x: e.clientX - r.left, y: e.clientY - r.top };
             fab.addClass('csi-fab-dragging');
         });
-        $(document).on('mousemove.csifab', function(e) {
-            if(!isDragging)return; hasMoved=true;
-            fab.css({left:e.clientX-dragOff.x,top:e.clientY-dragOff.y,right:'auto',bottom:'auto'});
+        $(document).on('mousemove' + NS + 'fab', function (e) {
+            if (!isDragging) return;
+            hasMoved = true;
+            // Don't persist mid-drag, just position
+            const fw = fab.outerWidth() || 42;
+            const fh = fab.outerHeight() || 42;
+            const ww = $(window).width();
+            const wh = $(window).height();
+            const l = Math.max(0, Math.min(e.clientX - dragOff.x, ww - fw));
+            const t = Math.max(0, Math.min(e.clientY - dragOff.y, wh - fh));
+            fab.css({ left: l, top: t, right: 'auto', bottom: 'auto' });
         });
-        $(document).on('mouseup.csifab', function() {
-            if(isDragging){isDragging=false;fab.removeClass('csi-fab-dragging');}
+        $(document).on('mouseup' + NS + 'fab', function () {
+            if (isDragging) {
+                isDragging = false;
+                fab.removeClass('csi-fab-dragging');
+                if (hasMoved) {
+                    // Persist final position
+                    const r = fab[0].getBoundingClientRect();
+                    clampFabPosition(r.left, r.top, true);
+                }
+            }
         });
 
         // Touch FAB drag
-        var fabTouchId = null;
-        fab[0].addEventListener('touchstart', function(e) {
-            e.stopImmediatePropagation(); e.preventDefault();
-            var t = e.changedTouches[0];
+        let fabTouchId = null;
+        function onFabTouchStart(e) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            const t = e.changedTouches[0];
             fabTouchId = t.identifier;
-            isDragging = true; hasMoved = false;
-            var r = fab[0].getBoundingClientRect();
-            dragOff = {x:t.clientX-r.left, y:t.clientY-r.top};
+            isDragging = true;
+            hasMoved = false;
+            const r = fab[0].getBoundingClientRect();
+            dragOff = { x: t.clientX - r.left, y: t.clientY - r.top };
             fab.addClass('csi-fab-dragging');
-        }, {passive:false});
-
-        fab[0].addEventListener('touchmove', function(e) {
-            if(!isDragging)return;
-            for(var i=0;i<e.changedTouches.length;i++){
-                if(e.changedTouches[i].identifier===fabTouchId){
-                    hasMoved=true;
-                    var t=e.changedTouches[i];
-                    fab.css({left:t.clientX-dragOff.x,top:t.clientY-dragOff.y,right:'auto',bottom:'auto'});
+        }
+        function onFabTouchMove(e) {
+            if (!isDragging) return;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === fabTouchId) {
+                    hasMoved = true;
+                    const t = e.changedTouches[i];
+                    const fw = fab.outerWidth() || 42;
+                    const fh = fab.outerHeight() || 42;
+                    const ww = $(window).width();
+                    const wh = $(window).height();
+                    const l = Math.max(0, Math.min(t.clientX - dragOff.x, ww - fw));
+                    const tt = Math.max(0, Math.min(t.clientY - dragOff.y, wh - fh));
+                    fab.css({ left: l, top: tt, right: 'auto', bottom: 'auto' });
                 }
             }
-        }, {passive:true});
-
-        fab[0].addEventListener('touchend', function(e) {
-            if(!isDragging)return;
-            isDragging=false; fab.removeClass('csi-fab-dragging');
-            if(!hasMoved) { touchHandled=true; setInspectorActive(!inspectorActive); }
-        }, {passive:true});
+        }
+        function onFabTouchEnd(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            fab.removeClass('csi-fab-dragging');
+            if (!hasMoved) {
+                touchHandled = true;
+                setInspectorActive(!inspectorActive);
+            } else {
+                const r = fab[0].getBoundingClientRect();
+                clampFabPosition(r.left, r.top, true);
+            }
+            fabTouchId = null;
+        }
+        fab[0].addEventListener('touchstart', onFabTouchStart, { passive: false });
+        fab[0].addEventListener('touchmove', onFabTouchMove, { passive: true });
+        fab[0].addEventListener('touchend', onFabTouchEnd, { passive: true });
+        fab[0].addEventListener('touchcancel', onFabTouchEnd, { passive: true });
 
         // FAB mouse click
-        fab.on('click', function(e) {
-            e.stopImmediatePropagation(); e.preventDefault();
-            if(touchHandled){touchHandled=false;return;}
-            if(hasMoved)return;
+        fab.on('click' + NS, function (e) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            if (touchHandled) { touchHandled = false; return; }
+            if (hasMoved) return;
             setInspectorActive(!inspectorActive);
         });
 
-        // === MOUSE HANDLERS ===
-        document.addEventListener('mouseover', function(e) {
-            if(!getSettings().enabled||!inspectorActive||isPinned||isDragging)return;
-            if(isInspectorEl(e.target))return;
-            inspectElement(e.target);
-        }, true);
+        // Window resize: re-clamp fab into viewport
+        const onResize = function () {
+            const r = fab[0].getBoundingClientRect();
+            clampFabPosition(r.left, r.top, false);
+        };
+        window.addEventListener('resize', onResize);
 
-        document.addEventListener('mousemove', function(e) {
-            if(!getSettings().enabled||!inspectorActive||isPinned||isDragging)return;
-            positionTooltip(e.pageX, e.pageY);
-        }, true);
+        // === MOUSE HANDLERS (with throttling for hot paths) ===
+        const throttledHover = rafThrottle(function (target) {
+            if (!getSettings().enabled || !inspectorActive || isPinned || isDragging) return;
+            if (isInspectorEl(target)) return;
+            inspectElement(target);
+        });
 
-        document.addEventListener('mouseout', function(e) {
-            if(!getSettings().enabled||!inspectorActive||isPinned)return;
-            if(isInspectorEl(e.relatedTarget))return;
+        const throttledMove = rafThrottle(function (px, py) {
+            if (!getSettings().enabled || !inspectorActive || isPinned || isDragging) return;
+            positionTooltip(px, py);
+        });
+
+        const onMouseOver = function (e) { throttledHover(e.target); };
+        const onMouseMove = function (e) { throttledMove(e.pageX, e.pageY); };
+        const onMouseOut = function (e) {
+            if (!getSettings().enabled || !inspectorActive || isPinned) return;
+            // Bug #15: relatedTarget=null means cursor left the window — clear highlight
+            if (e.relatedTarget && isInspectorEl(e.relatedTarget)) return;
+            // Don't clear if leaving to enter another normal element (mouseover will re-trigger)
+            if (e.relatedTarget) return;
             clearHighlight();
-        }, true);
-
-        document.addEventListener('click', function(e) {
-            if(!getSettings().enabled||!inspectorActive)return;
-            if(isInspectorEl(e.target))return;
-            e.preventDefault(); e.stopPropagation();
-            if(getSettings().clickLock && !isPinned) {
-                isPinned=true; tooltip.addClass('csi-pinned'); return;
-            }
-            if(isPinned) { isPinned=false; tooltip.removeClass('csi-pinned'); doCopy(e.target); return; }
-            doCopy(e.target);
-        }, true);
-
-        document.addEventListener('contextmenu', function(e) {
-            if(!getSettings().enabled||!inspectorActive)return;
+        };
+        const onClick = function (e) {
+            if (!getSettings().enabled || !inspectorActive) return;
+            if (isInspectorEl(e.target)) return;
             e.preventDefault();
-            if(isPinned){isPinned=false;tooltip.removeClass('csi-pinned');clearHighlight();}
-        }, true);
+            e.stopPropagation();
+            if (getSettings().clickLock && !isPinned) {
+                isPinned = true;
+                tooltip.addClass('csi-pinned');
+                return;
+            }
+            if (isPinned) {
+                isPinned = false;
+                tooltip.removeClass('csi-pinned');
+                doCopy(e.target);
+                return;
+            }
+            doCopy(e.target);
+        };
+        const onContextMenu = function (e) {
+            if (!getSettings().enabled || !inspectorActive) return;
+            e.preventDefault();
+            if (isPinned) {
+                isPinned = false;
+                tooltip.removeClass('csi-pinned');
+                clearHighlight();
+            }
+        };
+        const onKeyDown = function (e) {
+            if (e.key === 'Escape' && (isPinned || inspectorActive)) {
+                if (isPinned) {
+                    isPinned = false;
+                    tooltip.removeClass('csi-pinned');
+                    clearHighlight();
+                } else if (inspectorActive) {
+                    setInspectorActive(false);
+                }
+            }
+        };
 
-        document.addEventListener('keydown', function(e) {
-            if(e.key==='Escape'&&isPinned){isPinned=false;tooltip.removeClass('csi-pinned');clearHighlight();}
-        }, true);
+        document.addEventListener('mouseover', onMouseOver, true);
+        document.addEventListener('mousemove', onMouseMove, true);
+        document.addEventListener('mouseout', onMouseOut, true);
+        document.addEventListener('click', onClick, true);
+        document.addEventListener('contextmenu', onContextMenu, true);
+        document.addEventListener('keydown', onKeyDown, true);
 
         // === TOUCH HANDLERS ===
-        document.addEventListener('touchstart', function(e) {
-            var s = getSettings();
+        const onTouchStart = function (e) {
+            const s = getSettings();
             if (!s.enabled || !inspectorActive || isDragging) return;
+            if (!e.touches || !e.touches.length) return;
 
-            var touch = e.touches[0];
-            var el = document.elementFromPoint(touch.clientX, touch.clientY);
+            const touch = e.touches[0];
+            const el = document.elementFromPoint(touch.clientX, touch.clientY);
             if (!el || isInspectorEl(el)) return;
 
             e.preventDefault();
             e.stopPropagation();
 
+            // Pinned + tap on tooltip-pinned target -> copy & release
             if (isPinned && lastEl) {
                 isPinned = false;
                 tooltip.removeClass('csi-pinned');
@@ -419,31 +749,40 @@ jQuery(async function() {
                 return;
             }
 
+            // Tap same element again -> pin (if enabled)
             if (s.clickLock && lastEl === el && tooltip.is(':visible')) {
                 isPinned = true;
                 tooltip.addClass('csi-pinned');
                 return;
             }
 
+            // No clickLock: copy immediately
+            if (!s.clickLock && lastEl === el && tooltip.is(':visible')) {
+                doCopy(el);
+                return;
+            }
+
             inspectElement(el);
             positionTooltipForEl(el);
-        }, {passive:false, capture:true});
+        };
+        document.addEventListener('touchstart', onTouchStart, { passive: false, capture: true });
 
         // === SETTINGS UI ===
-        var earlyS = getSettings();
+        const earlyS = getSettings();
         if (earlyS.enabled) showFab(); else hideFab();
 
-        var settingsHtml;
-        try { settingsHtml = await $.get(extPath + '/settings.html'); } catch(e) { settingsHtml = ''; }
+        let settingsHtml;
+        try { settingsHtml = await $.get(extPath + '/settings.html'); } catch (e) { settingsHtml = ''; }
 
         if (settingsHtml) {
-            var rp = $('#extensions_settings2'), lp = $('#extensions_settings');
+            const rp = $('#extensions_settings2');
+            const lp = $('#extensions_settings');
             if (rp.length) rp.append(settingsHtml);
             else if (lp.length) lp.append(settingsHtml);
         }
 
         function loadUI() {
-            var s = getSettings();
+            const s = getSettings();
             $('#css_inspector_enabled').prop('checked', s.enabled);
             $('#css_inspector_theme').val(s.theme);
             $('#css_inspector_copy_mode').val(s.copyMode);
@@ -456,35 +795,79 @@ jQuery(async function() {
         }
 
         function bindCb(sel, key) {
-            $(sel).on('input', function(e) {
-                var s=getSettings(); s[key]=Boolean($(e.target).prop('checked'));
+            $(sel).on('input' + NS, function (e) {
+                const s = getSettings();
+                s[key] = Boolean($(e.target).prop('checked'));
                 saveSettingsDebounced();
-                if(key==='enabled'){if(s.enabled)showFab();else hideFab();}
+                if (key === 'enabled') {
+                    if (s.enabled) showFab(); else hideFab();
+                }
             });
         }
 
-        bindCb('#css_inspector_enabled','enabled');
-        bindCb('#css_inspector_show_dimensions','showDimensions');
-        bindCb('#css_inspector_show_computed','showComputed');
-        bindCb('#css_inspector_show_vars','showVariables');
-        bindCb('#css_inspector_show_boxmodel','showBoxModel');
-        bindCb('#css_inspector_click_lock','clickLock');
-        bindCb('#css_inspector_show_toasts','showToasts');
+        bindCb('#css_inspector_enabled', 'enabled');
+        bindCb('#css_inspector_show_dimensions', 'showDimensions');
+        bindCb('#css_inspector_show_computed', 'showComputed');
+        bindCb('#css_inspector_show_vars', 'showVariables');
+        bindCb('#css_inspector_show_boxmodel', 'showBoxModel');
+        bindCb('#css_inspector_click_lock', 'clickLock');
+        bindCb('#css_inspector_show_toasts', 'showToasts');
 
-        $('#css_inspector_theme').on('change', function(e) {
-            var s=getSettings(); s.theme=$(e.target).val(); saveSettingsDebounced(); applyTheme();
+        $('#css_inspector_theme').on('change' + NS, function (e) {
+            const s = getSettings();
+            s.theme = $(e.target).val();
+            saveSettingsDebounced();
+            applyTheme();
         });
-        $('#css_inspector_copy_mode').on('change', function(e) {
-            var s=getSettings(); s.copyMode=$(e.target).val(); saveSettingsDebounced();
+        $('#css_inspector_copy_mode').on('change' + NS, function (e) {
+            const s = getSettings();
+            s.copyMode = $(e.target).val();
+            saveSettingsDebounced();
         });
-        $('#css_inspector_reset_pos').on('click', function() {
-            fab.css({left:'',top:'',right:'15px',bottom:''});
+        $('#css_inspector_reset_pos').on('click' + NS, function () {
+            fab.css({ left: '', top: '', right: '15px', bottom: '' });
+            const s = getSettings();
+            s.fabPosition = null;
+            saveSettingsDebounced();
         });
 
         loadUI();
+        applyTheme();
 
-    } catch(error) {
+        // --- Dispose / cleanup function (Bug #2) ---
+        window.__cssInspectorDispose = function () {
+            try {
+                document.removeEventListener('mouseover', onMouseOver, true);
+                document.removeEventListener('mousemove', onMouseMove, true);
+                document.removeEventListener('mouseout', onMouseOut, true);
+                document.removeEventListener('click', onClick, true);
+                document.removeEventListener('contextmenu', onContextMenu, true);
+                document.removeEventListener('keydown', onKeyDown, true);
+                document.removeEventListener('touchstart', onTouchStart, { capture: true });
+                window.removeEventListener('resize', onResize);
+                if (fab[0]) {
+                    fab[0].removeEventListener('touchstart', onFabTouchStart);
+                    fab[0].removeEventListener('touchmove', onFabTouchMove);
+                    fab[0].removeEventListener('touchend', onFabTouchEnd);
+                    fab[0].removeEventListener('touchcancel', onFabTouchEnd);
+                }
+                $(document).off(NS + 'fab');
+                fab.off(NS);
+                tooltip.off();
+                $('#css_inspector_tooltip, #css_inspector_fab, .csi-box-margin, .csi-box-padding').remove();
+                $('.css-inspector-highlight').removeClass('css-inspector-highlight');
+                $('.csi-highlight-match').removeClass('csi-highlight-match');
+                document.body.classList.remove('csi-inspector-active');
+                window.__cssInspectorInitialized = false;
+            } catch (e) {
+                console.error('[CSS Inspector] Cleanup error:', e);
+            }
+        };
+
+    } catch (error) {
         console.error('[CSS Inspector] CRASH:', error);
-        if(typeof toastr!=='undefined') toastr.error('CRASH: '+(error&&error.message?error.message:String(error)), 'CSS Inspector');
+        if (typeof toastr !== 'undefined') {
+            toastr.error('CRASH: ' + (error && error.message ? error.message : String(error)), 'CSS Inspector');
+        }
     }
 });
