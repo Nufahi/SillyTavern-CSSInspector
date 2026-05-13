@@ -62,11 +62,34 @@
                 </label>
             </div>
             <div class="flex-container">
+                <input id="css_inspector_show_breadcrumbs" type="checkbox" />
+                <label for="css_inspector_show_breadcrumbs">
+                    <i class="fa-solid fa-sitemap"></i> <span>Show Breadcrumbs</span>
+                </label>
+            </div>
+            <div class="flex-container">
                 <input id="css_inspector_show_toasts" type="checkbox" />
                 <label for="css_inspector_show_toasts">
                     <i class="fa-solid fa-bell"></i> <span>Show Notifications</span>
                 </label>
             </div>
+            <hr>
+            <label for="css_inspector_hotkey_input">
+                <i class="fa-solid fa-keyboard"></i> <span>Toggle Hotkey</span>
+            </label>
+            <div class="flex-container" style="gap:6px; align-items:center;">
+                <input id="css_inspector_hotkey_input" type="text" class="text_pole" readonly
+                       placeholder="Click and press keys..." style="flex:1; cursor:pointer;" />
+                <div id="css_inspector_hotkey_clear" class="menu_button menu_button_icon" title="Clear hotkey">
+                    <i class="fa-solid fa-xmark"></i>
+                </div>
+                <div id="css_inspector_hotkey_reset" class="menu_button menu_button_icon" title="Reset to default">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </div>
+            </div>
+            <small style="opacity:0.7;">
+                Click the field, then press your desired combination. Modifiers (Ctrl/Shift/Alt) are recommended.
+            </small>
             <hr>
             <div id="css_inspector_reset_pos" class="menu_button menu_button_icon">
                 <i class="fa-solid fa-arrows-rotate"></i>
@@ -75,7 +98,7 @@
             <hr>
             <small>
                 <i class="fa-solid fa-circle-info"></i>
-                Click classes in tooltip to highlight all matching elements.
+                Click classes in tooltip to highlight matching elements. Pin the tooltip (click) to use breadcrumbs for navigation.
             </small>
         </div>
     </div>

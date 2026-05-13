@@ -7,6 +7,14 @@ body.csi-inspector-active * {
     cursor: crosshair !important;
 }
 
+/* --- Hotkey capture input --- */
+#css_inspector_hotkey_input.csi-hotkey-capturing {
+    border-color: #5c9aff !important;
+    box-shadow: 0 0 6px rgba(92, 154, 255, 0.4);
+    color: #5c9aff !important;
+    font-weight: bold;
+}
+
 /* --- Highlight --- */
 .css-inspector-highlight {
     outline: 2px solid #5c9aff !important;
@@ -75,6 +83,57 @@ body.csi-inspector-active * {
     text-align: center;
 }
 
+#css_inspector_tooltip .csi-hint-sub {
+    margin-top: 2px;
+    padding-top: 2px;
+    border-top: none;
+    color: #666;
+}
+
+/* --- Breadcrumbs --- */
+#css_inspector_tooltip .csi-breadcrumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #2a2a2a;
+    font-size: 10px;
+    line-height: 1.6;
+}
+
+#css_inspector_tooltip .csi-breadcrumbs .csi-icon {
+    margin-right: 2px;
+    margin-top: 0;
+}
+
+#css_inspector_tooltip .csi-crumb {
+    color: #888;
+    cursor: pointer;
+    padding: 1px 4px;
+    border-radius: 3px;
+    transition: background-color 0.1s, color 0.1s;
+    white-space: nowrap;
+}
+
+#css_inspector_tooltip .csi-crumb:hover {
+    background-color: rgba(92, 154, 255, 0.15);
+    color: #5c9aff;
+}
+
+#css_inspector_tooltip .csi-crumb-current {
+    color: #d4d4d4;
+    font-weight: bold;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+#css_inspector_tooltip .csi-crumb-sep {
+    color: #444;
+    padding: 0 1px;
+    user-select: none;
+}
+
 #css_inspector_tooltip .csi-var-name { color: #c792ea; }
 #css_inspector_tooltip .csi-var-value { color: #999; }
 #css_inspector_tooltip .csi-var-prop { color: #5c9aff; }
@@ -127,6 +186,32 @@ body.csi-inspector-active * {
 #css_inspector_tooltip.csi-theme-light .csi-hint {
     border-top-color: #ddd;
     color: #aaa;
+}
+
+#css_inspector_tooltip.csi-theme-light .csi-hint-sub {
+    color: #999;
+}
+
+#css_inspector_tooltip.csi-theme-light .csi-breadcrumbs {
+    border-bottom-color: #ddd;
+}
+
+#css_inspector_tooltip.csi-theme-light .csi-crumb {
+    color: #777;
+}
+
+#css_inspector_tooltip.csi-theme-light .csi-crumb:hover {
+    background-color: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
+}
+
+#css_inspector_tooltip.csi-theme-light .csi-crumb-current {
+    color: #222;
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+#css_inspector_tooltip.csi-theme-light .csi-crumb-sep {
+    color: #bbb;
 }
 
 #css_inspector_tooltip.csi-theme-light .csi-var-name { color: #7c3aed; }

@@ -27,6 +27,8 @@ jQuery(async function () {
             clickLock: true,
             showToasts: true,
             fabPosition: null, // {left, top} or null
+            hotkey: { ctrl: false, shift: false, alt: true, meta: false, key: 'i' }, // Alt+I (avoids browser DevTools shortcut)
+            showBreadcrumbs: true,
         };
 
         // --- Fixed deepMerge: preserves all keys from source AND target (Bug #1) ---
@@ -261,6 +263,46 @@ jQuery(async function () {
             clearMatchHighlights();
         }
 
+        // --- Breadcrumbs: ancestor chain from <body> to element ---
+        // Returns array of ancestors (excluding <html>/<body>) with the element itself last.
+        function getAncestorChain(el) {
+            const chain = [];
+            let c = el;
+            while (c && c !== document.body && c !== document.documentElement) {
+                chain.unshift(c);
+                c = c.parentElement;
+            }
+            return chain;
+        }
+
+        // Short label for breadcrumb item: tag + (id OR first non-inspector class)
+        function breadcrumbLabel(el) {
+            const tag = el.tagName ? el.tagName.toLowerCase() : '?';
+            if (el.id) return tag + '#' + el.id;
+            if (el.classList && el.classList.length) {
+                const f = Array.from(el.classList).filter(function (c) {
+                    return c !== 'css-inspector-highlight' && c !== 'csi-highlight-match';
+                })[0];
+                if (f) return tag + '.' + f;
+            }
+            return tag;
+        }
+
+        // Map breadcrumb items to elements (rebuilt every buildTooltip call)
+        let breadcrumbMap = [];
+
+        function buildBreadcrumbs(el) {
+            breadcrumbMap = getAncestorChain(el);
+            if (breadcrumbMap.length <= 1) return ''; // nothing to navigate
+            const parts = breadcrumbMap.map(function (node, idx) {
+                const isCurrent = (node === el);
+                const label = escapeHtml(breadcrumbLabel(node));
+                const cls = 'csi-crumb' + (isCurrent ? ' csi-crumb-current' : '');
+                return '<span class="' + cls + '" data-crumb-idx="' + idx + '">' + label + '</span>';
+            });
+            return '<div class="csi-breadcrumbs"><i class="fa-solid fa-sitemap csi-icon"></i>' + parts.join('<span class="csi-crumb-sep">›</span>') + '</div>';
+        }
+
         // --- Tooltip content (Bug #27: XSS-safe via escapeHtml) ---
         function buildTooltip(el) {
             const s = getSettings();
@@ -273,7 +315,14 @@ jQuery(async function () {
                 return '<span class="csi-class" data-classname="' + escapeHtml(c) + '">.' + escapeHtml(c) + '</span>';
             });
 
-            let h = '<div class="csi-row"><i class="fa-solid fa-code csi-icon"></i><span class="csi-tag">&lt;' + escapeHtml(tag) + '&gt;</span>' + idStr + '</div>';
+            let h = '';
+            if (s.showBreadcrumbs) {
+                h += buildBreadcrumbs(el);
+            } else {
+                breadcrumbMap = [];
+            }
+
+            h += '<div class="csi-row"><i class="fa-solid fa-code csi-icon"></i><span class="csi-tag">&lt;' + escapeHtml(tag) + '&gt;</span>' + idStr + '</div>';
 
             if (cls.length) {
                 h += '<div class="csi-row"><i class="fa-solid fa-layer-group csi-icon"></i><div class="csi-classes">' + cls.join('<br>') + '</div></div>';
@@ -317,6 +366,9 @@ jQuery(async function () {
             const ml = { full: 'tag#id.class', classes: '.class only', id: '#id only', path: 'DOM path', css: 'CSS rule block' };
             const hint = isTouchDevice ? 'tap again to copy' : 'click to copy';
             h += '<div class="csi-hint"><i class="fa-solid fa-copy"></i> ' + hint + ' (' + escapeHtml(ml[s.copyMode] || s.copyMode) + ')</div>';
+            if (s.showBreadcrumbs && breadcrumbMap.length > 1) {
+                h += '<div class="csi-hint csi-hint-sub"><i class="fa-solid fa-arrow-up"></i> ' + (isPinned ? 'click breadcrumb to navigate' : 'pin first to use breadcrumbs') + '</div>';
+            }
             return h;
         }
 
@@ -324,6 +376,19 @@ jQuery(async function () {
             e.stopPropagation();
             const cn = $(this).attr('data-classname');
             if (cn) highlightAllWithClass(cn);
+        });
+
+        // Click on breadcrumb -> navigate inspector to that ancestor (only works in pinned mode
+        // since tooltip has pointer-events:none otherwise)
+        tooltip.on('click', '.csi-crumb', function (e) {
+            e.stopPropagation();
+            e.preventDefault();
+            const idx = parseInt($(this).attr('data-crumb-idx'), 10);
+            if (isNaN(idx) || !breadcrumbMap[idx]) return;
+            const target = breadcrumbMap[idx];
+            if (!target.isConnected) return;
+            inspectElement(target);
+            positionTooltipForEl(target);
         });
 
         // --- Copy selectors ---
@@ -708,7 +773,53 @@ jQuery(async function () {
                 clearHighlight();
             }
         };
+        // --- Hotkey matching ---
+        function isTextEditTarget(target) {
+            if (!target) return false;
+            const tag = target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+            if (target.isContentEditable) return true;
+            return false;
+        }
+
+        function hotkeyMatches(e, hk) {
+            if (!hk || !hk.key) return false;
+            if (Boolean(e.ctrlKey) !== Boolean(hk.ctrl)) return false;
+            if (Boolean(e.shiftKey) !== Boolean(hk.shift)) return false;
+            if (Boolean(e.altKey) !== Boolean(hk.alt)) return false;
+            if (Boolean(e.metaKey) !== Boolean(hk.meta)) return false;
+            // Compare key case-insensitively (handles Shift turning 'i' into 'I')
+            return String(e.key).toLowerCase() === String(hk.key).toLowerCase();
+        }
+
+        function formatHotkey(hk) {
+            if (!hk || !hk.key) return '(none)';
+            const parts = [];
+            if (hk.ctrl) parts.push('Ctrl');
+            if (hk.shift) parts.push('Shift');
+            if (hk.alt) parts.push('Alt');
+            if (hk.meta) parts.push('Meta');
+            // Prettify key name
+            let k = hk.key;
+            if (k.length === 1) k = k.toUpperCase();
+            parts.push(k);
+            return parts.join('+');
+        }
+
         const onKeyDown = function (e) {
+            const s = getSettings();
+
+            // Toggle hotkey: only when extension is enabled and not typing
+            if (s.enabled && !isTextEditTarget(e.target) && hotkeyMatches(e, s.hotkey)) {
+                e.preventDefault();
+                e.stopPropagation();
+                setInspectorActive(!inspectorActive);
+                if (s.showToasts && typeof toastr !== 'undefined') {
+                    toastr.info(inspectorActive ? 'Inspector: ON' : 'Inspector: OFF', MODULE_NAME, { timeOut: 1000 });
+                }
+                return;
+            }
+
             if (e.key === 'Escape' && (isPinned || inspectorActive)) {
                 if (isPinned) {
                     isPinned = false;
@@ -792,6 +903,8 @@ jQuery(async function () {
             $('#css_inspector_show_boxmodel').prop('checked', s.showBoxModel);
             $('#css_inspector_click_lock').prop('checked', s.clickLock);
             $('#css_inspector_show_toasts').prop('checked', s.showToasts);
+            $('#css_inspector_show_breadcrumbs').prop('checked', s.showBreadcrumbs);
+            $('#css_inspector_hotkey_input').val(formatHotkey(s.hotkey));
         }
 
         function bindCb(sel, key) {
@@ -812,6 +925,61 @@ jQuery(async function () {
         bindCb('#css_inspector_show_boxmodel', 'showBoxModel');
         bindCb('#css_inspector_click_lock', 'clickLock');
         bindCb('#css_inspector_show_toasts', 'showToasts');
+        bindCb('#css_inspector_show_breadcrumbs', 'showBreadcrumbs');
+
+        // --- Hotkey capture: focus field, then press a combo ---
+        let hotkeyCapturing = false;
+        const $hkInput = $('#css_inspector_hotkey_input');
+
+        function setHotkeyDisplay() {
+            const s = getSettings();
+            $hkInput.val(formatHotkey(s.hotkey));
+        }
+
+        $hkInput.on('focus' + NS, function () {
+            hotkeyCapturing = true;
+            $hkInput.val('Press keys...').addClass('csi-hotkey-capturing');
+        });
+        $hkInput.on('blur' + NS, function () {
+            hotkeyCapturing = false;
+            $hkInput.removeClass('csi-hotkey-capturing');
+            setHotkeyDisplay();
+        });
+        $hkInput.on('keydown' + NS, function (e) {
+            if (!hotkeyCapturing) return;
+            // Ignore lone modifier presses
+            const onlyModifier = (e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'Meta');
+            e.preventDefault();
+            e.stopPropagation();
+            if (onlyModifier) return;
+            if (e.key === 'Escape') {
+                // Cancel without changing
+                $hkInput.blur();
+                return;
+            }
+            const s = getSettings();
+            s.hotkey = {
+                ctrl: !!e.ctrlKey,
+                shift: !!e.shiftKey,
+                alt: !!e.altKey,
+                meta: !!e.metaKey,
+                key: String(e.key).toLowerCase(),
+            };
+            saveSettingsDebounced();
+            $hkInput.blur();
+        });
+        $('#css_inspector_hotkey_clear').on('click' + NS, function () {
+            const s = getSettings();
+            s.hotkey = { ctrl: false, shift: false, alt: false, meta: false, key: '' };
+            saveSettingsDebounced();
+            setHotkeyDisplay();
+        });
+        $('#css_inspector_hotkey_reset').on('click' + NS, function () {
+            const s = getSettings();
+            s.hotkey = { ctrl: false, shift: false, alt: true, meta: false, key: 'i' };
+            saveSettingsDebounced();
+            setHotkeyDisplay();
+        });
 
         $('#css_inspector_theme').on('change' + NS, function (e) {
             const s = getSettings();
@@ -854,6 +1022,12 @@ jQuery(async function () {
                 $(document).off(NS + 'fab');
                 fab.off(NS);
                 tooltip.off();
+                // Settings UI handlers (in case settings panel persists across reloads)
+                $('#css_inspector_enabled, #css_inspector_show_dimensions, #css_inspector_show_computed, ' +
+                  '#css_inspector_show_vars, #css_inspector_show_boxmodel, #css_inspector_click_lock, ' +
+                  '#css_inspector_show_toasts, #css_inspector_show_breadcrumbs, #css_inspector_theme, ' +
+                  '#css_inspector_copy_mode, #css_inspector_reset_pos, #css_inspector_hotkey_input, ' +
+                  '#css_inspector_hotkey_clear, #css_inspector_hotkey_reset').off(NS);
                 $('#css_inspector_tooltip, #css_inspector_fab, .csi-box-margin, .csi-box-padding').remove();
                 $('.css-inspector-highlight').removeClass('css-inspector-highlight');
                 $('.csi-highlight-match').removeClass('csi-highlight-match');
