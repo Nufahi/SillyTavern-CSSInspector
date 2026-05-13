@@ -254,7 +254,8 @@ jQuery(async function () {
         }
 
         function clearHighlight() {
-            if (lastEl && lastEl.classList) {
+            // Bug #3: only touch the element if it's still in DOM (avoid zombie refs)
+            if (lastEl && lastEl.classList && lastEl.isConnected) {
                 lastEl.classList.remove('css-inspector-highlight');
             }
             lastEl = null;
@@ -406,7 +407,12 @@ jQuery(async function () {
         function getIdOnly(el) { return el.id ? '#' + el.id : getFullSelector(el); }
 
         // Bug #10: nth-of-type for siblings without unique id/class
+        // Bug #14: handle body/html as the inspected element itself
         function getDomPath(el) {
+            if (!el || !el.tagName) return '';
+            if (el === document.documentElement) return 'html';
+            if (el === document.body) return 'body';
+
             const parts = [];
             let c = el;
             while (c && c !== document.body && c !== document.documentElement) {
@@ -432,7 +438,7 @@ jQuery(async function () {
                 parts.unshift(segment);
                 c = c.parentElement;
             }
-            return parts.join(' > ');
+            return parts.length ? parts.join(' > ') : el.tagName.toLowerCase();
         }
 
         // Bug #11: build CSS block from matched rules + a few key inherited values
@@ -556,8 +562,9 @@ jQuery(async function () {
 
         // --- Inspect element ---
         function inspectElement(el) {
+            if (!el || !el.isConnected) return;
             const s = getSettings();
-            if (lastEl && lastEl !== el && lastEl.classList) {
+            if (lastEl && lastEl !== el && lastEl.classList && lastEl.isConnected) {
                 lastEl.classList.remove('css-inspector-highlight');
             }
             el.classList.add('css-inspector-highlight');
@@ -595,8 +602,9 @@ jQuery(async function () {
 
         function applyFabPosition() {
             const s = getSettings();
+            // Bug #2: don't persist on load — just apply the saved value
             if (s.fabPosition && typeof s.fabPosition.left === 'number' && typeof s.fabPosition.top === 'number') {
-                clampFabPosition(s.fabPosition.left, s.fabPosition.top, true);
+                clampFabPosition(s.fabPosition.left, s.fabPosition.top, false);
             }
         }
 
@@ -792,6 +800,38 @@ jQuery(async function () {
             return String(e.key).toLowerCase() === String(hk.key).toLowerCase();
         }
 
+        // Pretty-print key names (Bug #15/#16)
+        const KEY_DISPLAY_MAP = {
+            ' ': 'Space',
+            'arrowup': '↑',
+            'arrowdown': '↓',
+            'arrowleft': '←',
+            'arrowright': '→',
+            'escape': 'Esc',
+            'enter': 'Enter',
+            'tab': 'Tab',
+            'backspace': 'Backspace',
+            'delete': 'Del',
+            'insert': 'Ins',
+            'home': 'Home',
+            'end': 'End',
+            'pageup': 'PageUp',
+            'pagedown': 'PageDown',
+            'contextmenu': 'Menu',
+        };
+
+        function prettyKeyName(key) {
+            if (key == null) return '';
+            const lk = String(key).toLowerCase();
+            if (KEY_DISPLAY_MAP[lk]) return KEY_DISPLAY_MAP[lk];
+            // F1..F24
+            if (/^f([1-9]|1\d|2[0-4])$/.test(lk)) return lk.toUpperCase();
+            // Single character
+            if (key.length === 1) return key.toUpperCase();
+            // Capitalize first letter for anything else (e.g. "NumLock")
+            return key.charAt(0).toUpperCase() + key.slice(1);
+        }
+
         function formatHotkey(hk) {
             if (!hk || !hk.key) return '(none)';
             const parts = [];
@@ -799,14 +839,14 @@ jQuery(async function () {
             if (hk.shift) parts.push('Shift');
             if (hk.alt) parts.push('Alt');
             if (hk.meta) parts.push('Meta');
-            // Prettify key name
-            let k = hk.key;
-            if (k.length === 1) k = k.toUpperCase();
-            parts.push(k);
+            parts.push(prettyKeyName(hk.key));
             return parts.join('+');
         }
 
         const onKeyDown = function (e) {
+            // Bug #19: ignore key repeat (holding the hotkey shouldn't spam toggles)
+            if (e.repeat) return;
+
             const s = getSettings();
 
             // Toggle hotkey: only when extension is enabled and not typing
@@ -838,21 +878,57 @@ jQuery(async function () {
         document.addEventListener('contextmenu', onContextMenu, true);
         document.addEventListener('keydown', onKeyDown, true);
 
-        // === TOUCH HANDLERS ===
+        // === TOUCH HANDLERS (distinguish tap from scroll, Bug #22) ===
+        const TAP_MOVE_THRESHOLD = 10; // px
+        let touchStartInfo = null; // { x, y, el, moved }
+
         const onTouchStart = function (e) {
             const s = getSettings();
-            if (!s.enabled || !inspectorActive || isDragging) return;
+            if (!s.enabled || !inspectorActive || isDragging) {
+                touchStartInfo = null;
+                return;
+            }
             if (!e.touches || !e.touches.length) return;
 
             const touch = e.touches[0];
             const el = document.elementFromPoint(touch.clientX, touch.clientY);
-            if (!el || isInspectorEl(el)) return;
+            if (!el || isInspectorEl(el)) {
+                touchStartInfo = null;
+                return;
+            }
 
+            // Remember touch point — don't preventDefault yet, allow scrolling
+            touchStartInfo = { x: touch.clientX, y: touch.clientY, el: el, moved: false };
+        };
+
+        const onTouchMove = function (e) {
+            if (!touchStartInfo || touchStartInfo.moved) return;
+            if (!e.touches || !e.touches.length) return;
+            const t = e.touches[0];
+            const dx = Math.abs(t.clientX - touchStartInfo.x);
+            const dy = Math.abs(t.clientY - touchStartInfo.y);
+            if (dx > TAP_MOVE_THRESHOLD || dy > TAP_MOVE_THRESHOLD) {
+                touchStartInfo.moved = true; // it's a scroll/swipe
+            }
+        };
+
+        const onTouchEnd = function (e) {
+            const info = touchStartInfo;
+            touchStartInfo = null;
+            if (!info || info.moved) return; // was a scroll, not a tap
+
+            const s = getSettings();
+            if (!s.enabled || !inspectorActive) return;
+
+            const el = info.el;
+            if (!el || !el.isConnected || isInspectorEl(el)) return;
+
+            // It's a tap — now prevent any default click that would follow
             e.preventDefault();
             e.stopPropagation();
 
-            // Pinned + tap on tooltip-pinned target -> copy & release
-            if (isPinned && lastEl) {
+            // Pinned + tap -> copy & release
+            if (isPinned && lastEl && lastEl.isConnected) {
                 isPinned = false;
                 tooltip.removeClass('csi-pinned');
                 doCopy(lastEl);
@@ -860,14 +936,14 @@ jQuery(async function () {
                 return;
             }
 
-            // Tap same element again -> pin (if enabled)
+            // Tap same element again with clickLock -> pin
             if (s.clickLock && lastEl === el && tooltip.is(':visible')) {
                 isPinned = true;
                 tooltip.addClass('csi-pinned');
                 return;
             }
 
-            // No clickLock: copy immediately
+            // Tap same element again without clickLock -> copy
             if (!s.clickLock && lastEl === el && tooltip.is(':visible')) {
                 doCopy(el);
                 return;
@@ -876,7 +952,13 @@ jQuery(async function () {
             inspectElement(el);
             positionTooltipForEl(el);
         };
-        document.addEventListener('touchstart', onTouchStart, { passive: false, capture: true });
+
+        const onTouchCancel = function () { touchStartInfo = null; };
+
+        document.addEventListener('touchstart', onTouchStart, { passive: true, capture: true });
+        document.addEventListener('touchmove', onTouchMove, { passive: true, capture: true });
+        document.addEventListener('touchend', onTouchEnd, { passive: false, capture: true });
+        document.addEventListener('touchcancel', onTouchCancel, { capture: true });
 
         // === SETTINGS UI ===
         const earlyS = getSettings();
@@ -947,6 +1029,7 @@ jQuery(async function () {
         });
         $hkInput.on('keydown' + NS, function (e) {
             if (!hotkeyCapturing) return;
+            if (e.repeat) { e.preventDefault(); return; }
             // Ignore lone modifier presses
             const onlyModifier = (e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'Meta');
             e.preventDefault();
@@ -1012,6 +1095,9 @@ jQuery(async function () {
                 document.removeEventListener('contextmenu', onContextMenu, true);
                 document.removeEventListener('keydown', onKeyDown, true);
                 document.removeEventListener('touchstart', onTouchStart, { capture: true });
+                document.removeEventListener('touchmove', onTouchMove, { capture: true });
+                document.removeEventListener('touchend', onTouchEnd, { capture: true });
+                document.removeEventListener('touchcancel', onTouchCancel, { capture: true });
                 window.removeEventListener('resize', onResize);
                 if (fab[0]) {
                     fab[0].removeEventListener('touchstart', onFabTouchStart);
