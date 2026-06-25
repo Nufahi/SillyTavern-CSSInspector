@@ -1,3 +1,188 @@
+/* ======================== */
+/* --- THEME TOKENS        */
+/* ======================== */
+:root {
+    --csi-surface: color-mix(in srgb, var(--SmartThemeBlurTintColor, rgba(18, 18, 20, 0.96)) 88%, rgba(255, 255, 255, 0.03) 12%);
+    --csi-surface-strong: color-mix(in srgb, var(--SmartThemeBlurTintColor, rgba(18, 18, 20, 0.98)) 80%, rgba(255, 255, 255, 0.08) 20%);
+    --csi-border: color-mix(in srgb, var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.16)) 80%, rgba(255, 255, 255, 0.12) 20%);
+    --csi-accent: var(--SmartThemeQuoteColor, #5c9aff);
+    --csi-accent-soft: color-mix(in srgb, var(--SmartThemeQuoteColor, #5c9aff) 18%, var(--SmartThemeBlurTintColor, rgba(18, 18, 20, 0.98)) 82%);
+    --csi-text: var(--SmartThemeBodyColor, #f2f0eb);
+    --csi-muted: color-mix(in srgb, var(--SmartThemeBodyColor, #f2f0eb) 64%, var(--SmartThemeEmColor, #9b9b9b) 36%);
+}
+
+/* ======================== */
+/* --- SETTINGS PANEL      */
+/* ======================== */
+.css-class-inspector-settings .inline-drawer-header .csi-title-icon {
+    margin-right: 4px;
+    color: var(--csi-accent);
+}
+
+.css-class-inspector-settings .csi_settings_card {
+    margin-top: 6px;
+    padding: 14px;
+    border: 1px solid var(--csi-border);
+    border-radius: 14px;
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--csi-accent) 9%, transparent) 0%, transparent 22%),
+        var(--csi-surface);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+    color: var(--csi-text);
+    container-type: inline-size;
+    container-name: csi-settings;
+}
+
+.css-class-inspector-settings .csi_settings_intro {
+    margin: 0 0 12px;
+    font-size: 0.84em;
+    line-height: 1.5;
+    color: var(--csi-muted);
+}
+
+.css-class-inspector-settings .csi_settings_section {
+    margin-top: 14px;
+}
+
+.css-class-inspector-settings .csi_settings_heading {
+    margin: 0 0 8px;
+    font-size: 0.72em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--csi-muted);
+}
+
+.css-class-inspector-settings .csi_set_row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    margin: 0 0 6px;
+    border: 1px solid var(--csi-border);
+    border-radius: 10px;
+    background: var(--csi-surface-strong);
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.css-class-inspector-settings .csi_set_toggle {
+    cursor: pointer;
+}
+
+.css-class-inspector-settings .csi_set_row:hover {
+    border-color: color-mix(in srgb, var(--csi-accent) 40%, var(--csi-border) 60%);
+}
+
+.css-class-inspector-settings .csi_set_row:has(input:checked) {
+    border-color: color-mix(in srgb, var(--csi-accent) 55%, var(--csi-border) 45%);
+    background: color-mix(in srgb, var(--csi-accent) 12%, var(--csi-surface-strong) 88%);
+}
+
+.css-class-inspector-settings .csi_set_stack {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.css-class-inspector-settings .csi_set_text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.css-class-inspector-settings .csi_set_label {
+    font-size: 0.9em;
+    line-height: 1.35;
+}
+
+.css-class-inspector-settings .csi_set_label i {
+    margin-right: 4px;
+    color: var(--csi-accent);
+}
+
+.css-class-inspector-settings .csi_set_desc {
+    font-size: 0.76em;
+    line-height: 1.4;
+    color: var(--csi-muted);
+}
+
+.css-class-inspector-settings .csi_set_row input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--csi-accent);
+    cursor: pointer;
+}
+
+.css-class-inspector-settings .csi_set_control {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 140px;
+}
+
+.css-class-inspector-settings .csi_hotkey_controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.css-class-inspector-settings .csi_hotkey_input {
+    flex: 1 1 auto;
+    cursor: pointer;
+}
+
+.css-class-inspector-settings .csi_settings_primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 14px;
+    cursor: pointer;
+    font-weight: 600;
+    border-radius: 999px;
+    color: var(--csi-accent);
+    background: var(--csi-accent-soft);
+    border: 1px solid var(--csi-accent);
+    transition: background 0.15s ease, transform 0.08s ease;
+}
+
+.css-class-inspector-settings .csi_settings_primary:hover {
+    background: color-mix(in srgb, var(--csi-accent) 26%, var(--csi-surface) 74%);
+}
+
+.css-class-inspector-settings .csi_settings_primary:active {
+    transform: scale(0.98);
+}
+
+.css-class-inspector-settings .csi_settings_footnote {
+    margin: 14px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--csi-border);
+    font-size: 0.78em;
+    line-height: 1.5;
+    color: var(--csi-muted);
+}
+
+.css-class-inspector-settings .csi_settings_footnote i {
+    margin-right: 4px;
+    color: var(--csi-accent);
+}
+
+@container csi-settings (max-width: 360px) {
+    .css-class-inspector-settings .csi_set_row {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .css-class-inspector-settings .csi_set_control {
+        width: 100%;
+    }
+}
+
 /* --- Visual indicator: inspector active --- */
 body.csi-inspector-active {
     cursor: crosshair !important;

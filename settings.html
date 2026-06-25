@@ -1,105 +1,155 @@
 <div class="css-class-inspector-settings">
     <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
-            <b>CSS Class Inspector</b>
+            <b><i class="fa-solid fa-crosshairs csi-title-icon"></i> CSS Class Inspector</b>
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
         <div class="inline-drawer-content">
-            <div class="flex-container">
-                <input id="css_inspector_enabled" type="checkbox" />
-                <label for="css_inspector_enabled">
-                    <i class="fa-solid fa-eye"></i> <span>Show Inspector</span>
+
+            <div class="csi_settings_card">
+                <p class="csi_settings_intro">
+                    Hover any element to reveal its tag, id, classes and styles. Click to copy a
+                    selector. Toggle the inspector from the floating button or with your hotkey.
+                </p>
+
+                <label class="csi_set_row csi_set_toggle" for="css_inspector_enabled">
+                    <span class="csi_set_text">
+                        <span class="csi_set_label"><i class="fa-solid fa-eye"></i> Enable Inspector</span>
+                        <span class="csi_set_desc">Show the floating inspector button and enable element inspection.</span>
+                    </span>
+                    <input id="css_inspector_enabled" type="checkbox" />
                 </label>
-            </div>
-            <hr>
-            <label for="css_inspector_theme">
-                <i class="fa-solid fa-circle-half-stroke"></i> <span>Tooltip Theme</span>
-            </label>
-            <select id="css_inspector_theme" class="text_pole">
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
-            </select>
-            <hr>
-            <label for="css_inspector_copy_mode">
-                <i class="fa-solid fa-copy"></i> <span>Copy Mode</span>
-            </label>
-            <select id="css_inspector_copy_mode" class="text_pole">
-                <option value="full">Full selector (tag#id.class)</option>
-                <option value="classes">Classes only (.class.class)</option>
-                <option value="id">ID only (#id)</option>
-                <option value="path">Full DOM path</option>
-                <option value="css">CSS rule block</option>
-            </select>
-            <hr>
-            <div class="flex-container">
-                <input id="css_inspector_show_dimensions" type="checkbox" />
-                <label for="css_inspector_show_dimensions">
-                    <i class="fa-solid fa-ruler-combined"></i> <span>Show Dimensions</span>
-                </label>
-            </div>
-            <div class="flex-container">
-                <input id="css_inspector_show_computed" type="checkbox" />
-                <label for="css_inspector_show_computed">
-                    <i class="fa-solid fa-palette"></i> <span>Show Computed Styles</span>
-                </label>
-            </div>
-            <div class="flex-container">
-                <input id="css_inspector_show_vars" type="checkbox" />
-                <label for="css_inspector_show_vars">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Show CSS Variables</span>
-                </label>
-            </div>
-            <div class="flex-container">
-                <input id="css_inspector_show_boxmodel" type="checkbox" />
-                <label for="css_inspector_show_boxmodel">
-                    <i class="fa-solid fa-vector-square"></i> <span>Show Box Model</span>
-                </label>
-            </div>
-            <div class="flex-container">
-                <input id="css_inspector_click_lock" type="checkbox" />
-                <label for="css_inspector_click_lock">
-                    <i class="fa-solid fa-thumbtack"></i> <span>Click to Pin Tooltip</span>
-                </label>
-            </div>
-            <div class="flex-container">
-                <input id="css_inspector_show_breadcrumbs" type="checkbox" />
-                <label for="css_inspector_show_breadcrumbs">
-                    <i class="fa-solid fa-sitemap"></i> <span>Show Breadcrumbs</span>
-                </label>
-            </div>
-            <div class="flex-container">
-                <input id="css_inspector_show_toasts" type="checkbox" />
-                <label for="css_inspector_show_toasts">
-                    <i class="fa-solid fa-bell"></i> <span>Show Notifications</span>
-                </label>
-            </div>
-            <hr>
-            <label for="css_inspector_hotkey_input">
-                <i class="fa-solid fa-keyboard"></i> <span>Toggle Hotkey</span>
-            </label>
-            <div class="flex-container" style="gap:6px; align-items:center;">
-                <input id="css_inspector_hotkey_input" type="text" class="text_pole" readonly
-                       placeholder="Click and press keys..." style="flex:1; cursor:pointer;" />
-                <div id="css_inspector_hotkey_clear" class="menu_button menu_button_icon" title="Clear hotkey">
-                    <i class="fa-solid fa-xmark"></i>
+
+                <div class="csi_settings_section">
+                    <h4 class="csi_settings_heading">Appearance</h4>
+
+                    <div class="csi_set_row">
+                        <span class="csi_set_text">
+                            <span class="csi_set_label"><i class="fa-solid fa-circle-half-stroke"></i> Tooltip Theme</span>
+                            <span class="csi_set_desc">Color scheme for the inspector tooltip and button.</span>
+                        </span>
+                        <select id="css_inspector_theme" class="text_pole textarea_compact csi_set_control">
+                            <option value="dark">Dark</option>
+                            <option value="light">Light</option>
+                        </select>
+                    </div>
+
+                    <div class="csi_set_row">
+                        <span class="csi_set_text">
+                            <span class="csi_set_label"><i class="fa-solid fa-copy"></i> Copy Mode</span>
+                            <span class="csi_set_desc">What gets copied to clipboard when you click an element.</span>
+                        </span>
+                        <select id="css_inspector_copy_mode" class="text_pole textarea_compact csi_set_control">
+                            <option value="full">Full selector</option>
+                            <option value="classes">Classes only</option>
+                            <option value="id">ID only</option>
+                            <option value="path">Full DOM path</option>
+                            <option value="css">CSS rule block</option>
+                        </select>
+                    </div>
                 </div>
-                <div id="css_inspector_hotkey_reset" class="menu_button menu_button_icon" title="Reset to default">
-                    <i class="fa-solid fa-rotate-left"></i>
+
+                <div class="csi_settings_section">
+                    <h4 class="csi_settings_heading">Tooltip Content</h4>
+
+                    <label class="csi_set_row csi_set_toggle" for="css_inspector_show_dimensions">
+                        <span class="csi_set_text">
+                            <span class="csi_set_label"><i class="fa-solid fa-ruler-combined"></i> Show Dimensions</span>
+                            <span class="csi_set_desc">Display the element's width and height in pixels.</span>
+                        </span>
+                        <input id="css_inspector_show_dimensions" type="checkbox" />
+                    </label>
+
+                    <label class="csi_set_row csi_set_toggle" for="css_inspector_show_computed">
+                        <span class="csi_set_text">
+                            <span class="csi_set_label"><i class="fa-solid fa-palette"></i> Show Computed Styles</span>
+                            <span class="csi_set_desc">Display color, font and background from computed styles.</span>
+                        </span>
+                        <input id="css_inspector_show_computed" type="checkbox" />
+                    </label>
+
+                    <label class="csi_set_row csi_set_toggle" for="css_inspector_show_vars">
+                        <span class="csi_set_text">
+                            <span class="csi_set_label"><i class="fa-solid fa-wand-magic-sparkles"></i> Show CSS Variables</span>
+                            <span class="csi_set_desc">List CSS custom properties used by the element.</span>
+                        </span>
+                        <input id="css_inspector_show_vars" type="checkbox" />
+                    </label>
+
+                    <label class="csi_set_row csi_set_toggle" for="css_inspector_show_boxmodel">
+                        <span class="csi_set_text">
+                            <span class="csi_set_label"><i class="fa-solid fa-vector-square"></i> Show Box Model</span>
+                            <span class="csi_set_desc">Overlay margin/padding and list box-model values.</span>
+                        </span>
+                        <input id="css_inspector_show_boxmodel" type="checkbox" />
+                    </label>
+
+                    <label class="csi_set_row csi_set_toggle" for="css_inspector_show_breadcrumbs">
+                        <span class="csi_set_text">
+                            <span class="csi_set_label"><i class="fa-solid fa-sitemap"></i> Show Breadcrumbs</span>
+                            <span class="csi_set_desc">Show the ancestor chain for navigation when pinned.</span>
+                        </span>
+                        <input id="css_inspector_show_breadcrumbs" type="checkbox" />
+                    </label>
                 </div>
+
+                <div class="csi_settings_section">
+                    <h4 class="csi_settings_heading">Behavior</h4>
+
+                    <label class="csi_set_row csi_set_toggle" for="css_inspector_click_lock">
+                        <span class="csi_set_text">
+                            <span class="csi_set_label"><i class="fa-solid fa-thumbtack"></i> Click to Pin Tooltip</span>
+                            <span class="csi_set_desc">First click pins the tooltip; click again to copy.</span>
+                        </span>
+                        <input id="css_inspector_click_lock" type="checkbox" />
+                    </label>
+
+                    <label class="csi_set_row csi_set_toggle" for="css_inspector_show_toasts">
+                        <span class="csi_set_text">
+                            <span class="csi_set_label"><i class="fa-solid fa-bell"></i> Show Notifications</span>
+                            <span class="csi_set_desc">Display toast messages on copy and other actions.</span>
+                        </span>
+                        <input id="css_inspector_show_toasts" type="checkbox" />
+                    </label>
+                </div>
+
+                <div class="csi_settings_section">
+                    <h4 class="csi_settings_heading">Hotkey</h4>
+
+                    <div class="csi_set_row csi_set_stack">
+                        <span class="csi_set_text">
+                            <span class="csi_set_label"><i class="fa-solid fa-keyboard"></i> Toggle Hotkey</span>
+                            <span class="csi_set_desc">Click the field, then press your combination. Modifiers (Ctrl/Shift/Alt) recommended.</span>
+                        </span>
+                        <div class="csi_hotkey_controls">
+                            <input id="css_inspector_hotkey_input" type="text" class="text_pole csi_hotkey_input"
+                                   readonly placeholder="Click and press keys..." />
+                            <div id="css_inspector_hotkey_clear" class="menu_button menu_button_icon interactable" title="Clear hotkey">
+                                <i class="fa-solid fa-xmark"></i>
+                            </div>
+                            <div id="css_inspector_hotkey_reset" class="menu_button menu_button_icon interactable" title="Reset to default">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="csi_settings_section">
+                    <h4 class="csi_settings_heading">Maintenance</h4>
+
+                    <div id="css_inspector_reset_pos" class="csi_settings_primary interactable">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                        <span>Reset Button Position</span>
+                    </div>
+                </div>
+
+                <p class="csi_settings_footnote">
+                    <i class="fa-solid fa-circle-info"></i>
+                    Click classes in the tooltip to highlight matching elements. Pin the tooltip
+                    (click) to use breadcrumbs for navigation.
+                </p>
             </div>
-            <small style="opacity:0.7;">
-                Click the field, then press your desired combination. Modifiers (Ctrl/Shift/Alt) are recommended.
-            </small>
-            <hr>
-            <div id="css_inspector_reset_pos" class="menu_button menu_button_icon">
-                <i class="fa-solid fa-arrows-rotate"></i>
-                <span>Reset Button Position</span>
-            </div>
-            <hr>
-            <small>
-                <i class="fa-solid fa-circle-info"></i>
-                Click classes in tooltip to highlight matching elements. Pin the tooltip (click) to use breadcrumbs for navigation.
-            </small>
+
         </div>
     </div>
 </div>
