@@ -16,7 +16,7 @@
 /* ======================== */
 .css-class-inspector-settings .inline-drawer-header .csi-title-icon {
     margin-right: 4px;
-    color: var(--csi-accent);
+    color: var(--csi-text);
 }
 
 .css-class-inspector-settings .csi_settings_card {
