@@ -162,22 +162,23 @@ jQuery(async function () {
         // ============================================================
         // --- Phone / device preview mode
         // ------------------------------------------------------------
-        // Not a true viewport emulation (that requires an <iframe> or the
-        // browser's own device toolbar). Instead we constrain SillyTavern's
-        // main container (#sheld) to a fixed width and draw a phone frame
-        // around it. Container-based (@container) responsive styles and any
-        // width-driven flex/grid layout will react; viewport-based
-        // @media (max-width) queries will NOT, since the real viewport is
-        // unchanged. A small on-screen notice makes that limitation clear.
+        // Full-app preview. Instead of moving DOM around, we wrap ALL of
+        // SillyTavern's top-level body children into a single wrapper and give
+        // that wrapper a fixed "device" width plus a transform: scale() so the
+        // whole thing shrinks into a phone-shaped frame. Because a CSS
+        // transform establishes a containing block, even position:fixed panels
+        // (drawers, #movingDivs) stay inside the frame and remain clickable.
+        //
+        // This is NOT true viewport emulation: @media (max-width) rules that
+        // read the real viewport won't change (that needs the browser's device
+        // toolbar / an iframe). But every control stays interactive, which is
+        // the point of previewing the layout. A notice makes this clear.
         // ============================================================
-        const PHONE_TARGET_SELECTOR = '#sheld';
-        let phoneStage = null; // wrapper that centers + frames the device
-        let phoneOriginalParent = null;
-        let phoneOriginalNext = null; // sibling to restore insertion order
-
-        function getPhoneTarget() {
-            return document.querySelector(PHONE_TARGET_SELECTOR);
-        }
+        let phoneStage = null;        // full-screen backdrop + toolbar
+        let phoneFrame = null;         // the phone-shaped bezel
+        let phoneViewport = null;      // fixed-width, scaled wrapper holding the app
+        let phoneMovedNodes = [];      // body children relocated into the viewport
+        const PHONE_FRAME_HEIGHT = 844; // virtual device height (px, iPhone-ish)
 
         function buildPhoneStage() {
             const stage = document.createElement('div');
@@ -186,38 +187,53 @@ jQuery(async function () {
                 '<div id="csi_phone_toolbar">' +
                     '<span class="csi-phone-title"><i class="fa-solid fa-mobile-screen-button"></i> Device Preview</span>' +
                     '<span id="csi_phone_dim" class="csi-phone-dim"></span>' +
-                    '<span class="csi-phone-note" title="Container-based preview: @media (max-width) rules that read the real viewport will not change.">' +
+                    '<span class="csi-phone-note" title="Full UI preview: everything stays clickable. @media (max-width) rules that read the real viewport will not change.">' +
                         '<i class="fa-solid fa-circle-info"></i> approx.</span>' +
                     '<button id="csi_phone_exit" class="csi-phone-exit" title="Exit device preview"><i class="fa-solid fa-xmark"></i></button>' +
                 '</div>' +
-                '<div id="csi_phone_frame"><div id="csi_phone_slot"></div></div>';
+                '<div id="csi_phone_frame"><div id="csi_phone_viewport"></div></div>';
             return stage;
         }
 
+        // Elements we must NOT move into the preview (our own overlays + non-visual).
+        function isMovableBodyChild(node) {
+            if (!node || node.nodeType !== 1) return false;
+            const skip = {
+                'csi_phone_stage': 1,
+                'css_inspector_tooltip': 1,
+                'css_inspector_fab': 1,
+                'toast-container': 1,
+                'preloader': 1,
+                'secrets_datalists': 1,
+            };
+            if (node.id && skip[node.id]) return false;
+            if (node.classList && (node.classList.contains('csi-box-margin') || node.classList.contains('csi-box-padding'))) return false;
+            if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE' || node.tagName === 'LINK') return false;
+            return true;
+        }
+
         function enterPhoneMode() {
-            const target = getPhoneTarget();
-            if (!target) {
-                if (getSettings().showToasts && typeof toastr !== 'undefined') {
-                    toastr.warning('Could not find the main container (' + PHONE_TARGET_SELECTOR + ')', MODULE_NAME);
-                }
-                // reflect failure back into settings/UI
-                const s = getSettings();
-                s.phoneMode = false;
-                saveSettingsDebounced();
-                $('#css_inspector_phone_mode').prop('checked', false);
-                return;
-            }
             if (phoneStage) return; // already active
 
             phoneStage = buildPhoneStage();
             document.body.appendChild(phoneStage);
             document.body.classList.add('csi-phone-active');
 
-            // Remember where the target lived so we can put it back exactly.
-            phoneOriginalParent = target.parentNode;
-            phoneOriginalNext = target.nextSibling;
+            phoneFrame = phoneStage.querySelector('#csi_phone_frame');
+            phoneViewport = phoneStage.querySelector('#csi_phone_viewport');
 
-            phoneStage.querySelector('#csi_phone_slot').appendChild(target);
+            // Move every real UI node into the scaled viewport, remembering a
+            // placeholder so we can restore exact order on exit.
+            phoneMovedNodes = [];
+            const children = Array.from(document.body.childNodes);
+            for (let i = 0; i < children.length; i++) {
+                const node = children[i];
+                if (!isMovableBodyChild(node)) continue;
+                const placeholder = document.createComment('csi-phone-ph');
+                node.parentNode.insertBefore(placeholder, node);
+                phoneMovedNodes.push({ node: node, placeholder: placeholder });
+                phoneViewport.appendChild(node);
+            }
 
             phoneStage.querySelector('#csi_phone_exit').addEventListener('click', function () {
                 const s = getSettings();
@@ -227,38 +243,57 @@ jQuery(async function () {
                 exitPhoneMode();
             });
 
+            window.addEventListener('resize', applyPhoneWidth);
             applyPhoneWidth();
         }
 
         function exitPhoneMode() {
             if (!phoneStage) return;
-            const slot = phoneStage.querySelector('#csi_phone_slot');
-            const target = slot ? slot.firstElementChild : null;
+            window.removeEventListener('resize', applyPhoneWidth);
 
-            // Restore the target to its original DOM position.
-            if (target && phoneOriginalParent) {
-                if (phoneOriginalNext && phoneOriginalNext.parentNode === phoneOriginalParent) {
-                    phoneOriginalParent.insertBefore(target, phoneOriginalNext);
+            // Restore each moved node back to its original position.
+            for (let i = 0; i < phoneMovedNodes.length; i++) {
+                const entry = phoneMovedNodes[i];
+                const ph = entry.placeholder;
+                if (ph && ph.parentNode) {
+                    ph.parentNode.insertBefore(entry.node, ph);
+                    ph.parentNode.removeChild(ph);
                 } else {
-                    phoneOriginalParent.appendChild(target);
+                    document.body.appendChild(entry.node);
                 }
             }
+            phoneMovedNodes = [];
 
             phoneStage.remove();
             phoneStage = null;
-            phoneOriginalParent = null;
-            phoneOriginalNext = null;
+            phoneFrame = null;
+            phoneViewport = null;
             document.body.classList.remove('csi-phone-active');
         }
 
         function applyPhoneWidth() {
-            if (!phoneStage) return;
+            if (!phoneStage || !phoneFrame || !phoneViewport) return;
             const s = getSettings();
             const w = Math.max(280, Math.min(1024, parseInt(s.phoneWidth, 10) || 390));
-            const frame = phoneStage.querySelector('#csi_phone_frame');
+
+            // Available space: viewport minus toolbar and some padding.
+            const avW = Math.max(200, window.innerWidth - 40);
+            const avH = Math.max(200, window.innerHeight - 120);
+
+            // Fit the virtual device (w x PHONE_FRAME_HEIGHT) into available space.
+            const scale = Math.min(1, avW / w, avH / PHONE_FRAME_HEIGHT);
+
+            // The viewport is authored at full device size, then scaled down.
+            phoneViewport.style.width = w + 'px';
+            phoneViewport.style.height = PHONE_FRAME_HEIGHT + 'px';
+            phoneViewport.style.transform = 'scale(' + scale + ')';
+
+            // The bezel matches the scaled visual size so it hugs the content.
+            phoneFrame.style.width = Math.round(w * scale) + 'px';
+            phoneFrame.style.height = Math.round(PHONE_FRAME_HEIGHT * scale) + 'px';
+
             const dim = phoneStage.querySelector('#csi_phone_dim');
-            if (frame) frame.style.width = w + 'px';
-            if (dim) dim.textContent = w + 'px';
+            if (dim) dim.textContent = w + ' x ' + PHONE_FRAME_HEIGHT + ' @ ' + Math.round(scale * 100) + '%';
         }
 
         function applyPhoneMode() {

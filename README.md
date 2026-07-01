@@ -45,10 +45,10 @@ Visual margin (blue) and padding (green) overlays rendered directly on the page,
 
 ### Device Preview (Phone Mode)
 
-Constrain SillyTavern's main UI to a phone-sized frame right on the desktop to preview how responsive/adaptive layouts behave at narrow widths. Choose a device preset (iPhone, Pixel, iPad, etc.) or type a custom width.
+Shrink the **entire** SillyTavern UI into a phone-shaped frame right on the desktop to preview how responsive/adaptive layouts behave at narrow widths. All controls (drawers, settings, nav panels, chat input) stay fully interactive. Choose a device preset (iPhone, Pixel, iPad, etc.) or type a custom width.
 
 > [!NOTE]
-> This is a **container-based** preview: layouts driven by element/container width and `@container` queries will react, but `@media (max-width)` rules that read the *real* viewport will not change (true viewport emulation requires the browser's own device toolbar).
+> The whole app is scaled into the frame, so everything remains clickable. This is **not** true viewport emulation: `@media (max-width)` rules that read the *real* viewport will not change (that requires the browser's own device toolbar). Width-driven and `@container` layouts do react.
 
 ### Settings Panel
 

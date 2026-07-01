@@ -635,10 +635,8 @@ body.csi-inspector-active :not(#css_inspector_fab):not(#css_inspector_fab *) {
 
 #csi_phone_frame {
     position: relative;
-    flex: 1 1 auto;
-    max-width: 96vw;
-    min-height: 0;
-    height: min(88vh, 900px);
+    flex: 0 0 auto;
+    /* width/height set inline by JS to match the scaled viewport */
     border: 10px solid #0c0c0e;
     border-radius: 34px;
     background: #0c0c0e;
@@ -657,32 +655,32 @@ body.csi-inspector-active :not(#css_inspector_fab):not(#css_inspector_fab *) {
     transform: translateX(-50%);
     width: 42%;
     max-width: 160px;
-    height: 20px;
+    height: 18px;
     background: #0c0c0e;
     border-bottom-left-radius: 12px;
     border-bottom-right-radius: 12px;
-    z-index: 2;
+    z-index: 2147483000; /* above scaled app content */
     pointer-events: none;
 }
 
-#csi_phone_slot {
-    width: 100%;
-    height: 100%;
-    overflow: auto;
+/* The scaled viewport holds the entire SillyTavern UI at full device size,
+   then transform:scale() shrinks it visually. transform-origin top-left so
+   the scaled box lines up with the bezel's top-left corner. */
+#csi_phone_viewport {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: top left;
+    overflow: hidden;
     background: var(--SmartThemeBlurTintColor, #1a1a1d);
+    /* width / height / transform set inline by JS */
 }
 
-/* The wrapped SillyTavern container must fill the phone slot regardless of
-   its original fixed/absolute positioning. */
-#csi_phone_slot > * {
-    position: static !important;
-    inset: auto !important;
-    width: 100% !important;
-    height: 100% !important;
-    max-width: 100% !important;
-    max-height: 100% !important;
-    margin: 0 !important;
-    transform: none !important;
+/* Inside the preview, position:fixed elements are contained by the viewport's
+   transform, but many ST panels use viewport units for sizing. Keep them from
+   spilling past the device box. */
+#csi_phone_viewport > * {
+    max-width: 100%;
 }
 
 /* Keep the inspector's own light theme readable inside the frame toolbar too */
