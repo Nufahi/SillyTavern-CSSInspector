@@ -43,13 +43,6 @@ Click on any class name inside the tooltip to highlight every element on the pag
 
 Visual margin (blue) and padding (green) overlays rendered directly on the page, similar to Chrome DevTools.
 
-### Device Preview (Phone Mode)
-
-Shrink the **entire** SillyTavern UI into a phone-shaped frame right on the desktop to preview how responsive/adaptive layouts behave at narrow widths. All controls (drawers, settings, nav panels, chat input) stay fully interactive. Choose a device preset (iPhone, Pixel, iPad, etc.) or type a custom width.
-
-> [!NOTE]
-> The whole app is scaled into the frame, so everything remains clickable. This is **not** true viewport emulation: `@media (max-width)` rules that read the *real* viewport will not change (that requires the browser's own device toolbar). Width-driven and `@container` layouts do react.
-
 ### Settings Panel
 
 <img width="408" height="560" alt="image_2026-03-23_17-58-00 (2)" src="https://github.com/user-attachments/assets/c2a9a163-2cd7-4c64-b07b-b68a417cfcdc" />
@@ -62,7 +55,6 @@ All options are configurable from the Extensions panel:
 - Toggle: dimensions, computed styles, CSS variables, box model
 - Click Lock - pin tooltip before copying (prevents accidental copies)
 - Toast notifications - show or hide copy confirmations
-- Phone Mode - toggle device preview and pick a device width
 - Reset Position - snap the FAB back to its default location
 
 ---
