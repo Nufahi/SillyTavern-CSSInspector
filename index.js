@@ -251,6 +251,9 @@ jQuery(async function () {
         let lastEl = null;
         let isPinned = false;
         let inspectorActive = false;
+        // True while the user is walking the DOM tree with the keyboard. In this
+        // mode we ignore hover so the mouse doesn't yank the selection back.
+        let keyboardNav = false;
 
         // Bug #13: include box overlays. Bug #15: handle null.
         function isInspectorEl(el) {
@@ -273,6 +276,55 @@ jQuery(async function () {
             tooltip.hide();
             hideBoxOverlays();
             clearMatchHighlights();
+        }
+
+        // --- DOM tree navigation helpers (keyboard capture) ---
+        // Parent to move "up" the tree, stopping at <body>.
+        function getNavParent(el) {
+            if (!el) return null;
+            const p = el.parentElement;
+            if (!p || p === document.body || p === document.documentElement) return null;
+            if (isInspectorEl(p)) return null;
+            return p;
+        }
+
+        // First element child worth inspecting when moving "down" the tree.
+        // Skips our own overlay nodes; returns null if there's nothing.
+        function getNavChild(el) {
+            if (!el || !el.children) return null;
+            for (let i = 0; i < el.children.length; i++) {
+                const c = el.children[i];
+                if (!isInspectorEl(c)) return c;
+            }
+            return null;
+        }
+
+        // Previous / next inspectable sibling (for left/right navigation).
+        function getNavSibling(el, dir) {
+            if (!el) return null;
+            let c = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
+            while (c) {
+                if (!isInspectorEl(c)) return c;
+                c = dir < 0 ? c.previousElementSibling : c.nextElementSibling;
+            }
+            return null;
+        }
+
+        // Move the current selection through the tree and refresh the tooltip.
+        // Positions relative to the element (like a pinned view) so it stays put.
+        function navigateTree(dir) {
+            if (!inspectorActive || !getSettings().enabled) return;
+            const cur = lastEl;
+            if (!cur || !cur.isConnected) return;
+            let next = null;
+            if (dir === 'up') next = getNavParent(cur);
+            else if (dir === 'down') next = getNavChild(cur);
+            else if (dir === 'prev') next = getNavSibling(cur, -1);
+            else if (dir === 'next') next = getNavSibling(cur, 1);
+            if (!next) return;
+            keyboardNav = true; // suppress hover until the mouse moves again
+            inspectElement(next);
+            positionTooltipForEl(next);
         }
 
         // --- Breadcrumbs: ancestor chain from <body> to element ---
@@ -378,6 +430,9 @@ jQuery(async function () {
             const ml = { full: 'tag#id.class', classes: '.class only', id: '#id only', path: 'DOM path', css: 'CSS rule block' };
             const hint = isTouchDevice ? 'tap again to copy' : 'click to copy';
             h += '<div class="csi-hint"><i class="fa-solid fa-copy"></i> ' + hint + ' (' + escapeHtml(ml[s.copyMode] || s.copyMode) + ')</div>';
+            if (!isTouchDevice) {
+                h += '<div class="csi-hint csi-hint-sub"><i class="fa-solid fa-up-down-left-right"></i> arrow keys: navigate DOM tree</div>';
+            }
             if (s.showBreadcrumbs && breadcrumbMap.length > 1) {
                 h += '<div class="csi-hint csi-hint-sub"><i class="fa-solid fa-arrow-up"></i> ' + (isPinned ? 'click breadcrumb to navigate' : 'pin first to use breadcrumbs') + '</div>';
             }
@@ -603,6 +658,7 @@ jQuery(async function () {
         // --- FAB ---
         function setInspectorActive(val) {
             inspectorActive = val;
+            keyboardNav = false;
             fab.toggleClass('csi-fab-active', val);
             document.body.classList.toggle('csi-inspector-active', val);
             if (!val) {
@@ -746,20 +802,39 @@ jQuery(async function () {
 
         // === MOUSE HANDLERS (with throttling for hot paths) ===
         const throttledHover = rafThrottle(function (target) {
-            if (!getSettings().enabled || !inspectorActive || isPinned || isDragging) return;
+            if (!getSettings().enabled || !inspectorActive || isPinned || isDragging || keyboardNav) return;
             if (isInspectorEl(target)) return;
             inspectElement(target);
         });
 
-        const throttledMove = rafThrottle(function (px, py) {
-            if (!getSettings().enabled || !inspectorActive || isPinned || isDragging) return;
+        // On fast pointer motion mouseover can skip elements (it only fires when
+        // the topmost target changes and events can be coalesced). Re-resolve the
+        // element under the cursor on every move via elementFromPoint so the
+        // highlight never lags or drops. cx/cy are client coords, px/py are page.
+        const throttledMove = rafThrottle(function (cx, cy, px, py) {
+            if (!getSettings().enabled || !inspectorActive || isPinned || isDragging || keyboardNav) return;
             positionTooltip(px, py);
+            const under = document.elementFromPoint(cx, cy);
+            if (under && !isInspectorEl(under) && under !== lastEl) {
+                inspectElement(under);
+            }
         });
 
-        const onMouseOver = function (e) { throttledHover(e.target); };
-        const onMouseMove = function (e) { throttledMove(e.pageX, e.pageY); };
+        const onMouseOver = function (e) {
+            // A genuine mouse event means the user is driving with the pointer
+            // again, so leave keyboard-navigation mode.
+            keyboardNav = false;
+            throttledHover(e.target);
+        };
+        const onMouseMove = function (e) {
+            keyboardNav = false;
+            throttledMove(e.clientX, e.clientY, e.pageX, e.pageY);
+        };
         const onMouseOut = function (e) {
             if (!getSettings().enabled || !inspectorActive || isPinned) return;
+            // Keep the current selection while navigating with the keyboard even
+            // if the pointer wanders off the window.
+            if (keyboardNav) return;
             // Bug #15: relatedTarget=null means cursor left the window — clear highlight
             if (e.relatedTarget && isInspectorEl(e.relatedTarget)) return;
             // Don't clear if leaving to enter another normal element (mouseover will re-trigger)
@@ -856,13 +931,12 @@ jQuery(async function () {
         }
 
         const onKeyDown = function (e) {
-            // Bug #19: ignore key repeat (holding the hotkey shouldn't spam toggles)
-            if (e.repeat) return;
-
             const s = getSettings();
 
-            // Toggle hotkey: only when extension is enabled and not typing
-            if (s.enabled && !isTextEditTarget(e.target) && hotkeyMatches(e, s.hotkey)) {
+            // Toggle hotkey: only when extension is enabled and not typing.
+            // Bug #19: ignore key repeat here (holding the hotkey shouldn't spam
+            // toggles) — but repeat IS allowed for arrow navigation below.
+            if (!e.repeat && s.enabled && !isTextEditTarget(e.target) && hotkeyMatches(e, s.hotkey)) {
                 e.preventDefault();
                 e.stopPropagation();
                 setInspectorActive(!inspectorActive);
@@ -879,6 +953,23 @@ jQuery(async function () {
                     clearHighlight();
                 } else if (inspectorActive) {
                     setInspectorActive(false);
+                }
+                return;
+            }
+
+            // --- DOM tree navigation with arrow keys ---
+            // Only while inspecting, with an element selected, and not typing.
+            // Up = parent, Down = first child, Left/Right = siblings.
+            if (inspectorActive && lastEl && lastEl.isConnected && !isTextEditTarget(e.target)) {
+                let dir = null;
+                if (e.key === 'ArrowUp') dir = 'up';
+                else if (e.key === 'ArrowDown') dir = 'down';
+                else if (e.key === 'ArrowLeft') dir = 'prev';
+                else if (e.key === 'ArrowRight') dir = 'next';
+                if (dir) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigateTree(dir);
                 }
             }
         };

@@ -91,8 +91,13 @@ https://github.com/Nufahi/SillyTavern-CSSInspector
 ### Keyboard Shortcuts
 | Key | Action |
 |---|---|
+| `↑` | Select the parent element |
+| `↓` | Select the first child element |
+| `←` / `→` | Select the previous / next sibling |
 | `Escape` | Unpin tooltip, cancel inspection |
 | Right-click | Unpin and dismiss (desktop) |
+
+While inspecting, use the arrow keys to walk the DOM tree - handy when the element you want is a tiny nested `<span>` or icon that's hard to hover precisely. Move the mouse again to return to hover mode.
 
 ---
 
