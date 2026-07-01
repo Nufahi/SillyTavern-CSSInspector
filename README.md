@@ -17,7 +17,7 @@ A draggable crosshair button that floats over the UI. Drag it anywhere, click to
 
 ### Element Inspection
 - **Desktop:** hover over any element to see a tooltip with full details. Click to pin the tooltip, click again to copy.
-- **Mobile (desktop mode):** works when the browser is switched to desktop site mode. Tap to inspect, tap again to pin, third tap copies.
+- **Mobile:** native touch support - tap to inspect, tap again to pin, third tap copies. Scrolling is preserved (a tap is only registered if you don't drag).
 
 ### 5 Copy Modes
 
@@ -43,6 +43,13 @@ Click on any class name inside the tooltip to highlight every element on the pag
 
 Visual margin (blue) and padding (green) overlays rendered directly on the page, similar to Chrome DevTools.
 
+### Device Preview (Phone Mode)
+
+Constrain SillyTavern's main UI to a phone-sized frame right on the desktop to preview how responsive/adaptive layouts behave at narrow widths. Choose a device preset (iPhone, Pixel, iPad, etc.) or type a custom width.
+
+> [!NOTE]
+> This is a **container-based** preview: layouts driven by element/container width and `@container` queries will react, but `@media (max-width)` rules that read the *real* viewport will not change (true viewport emulation requires the browser's own device toolbar).
+
 ### Settings Panel
 
 <img width="408" height="560" alt="image_2026-03-23_17-58-00 (2)" src="https://github.com/user-attachments/assets/c2a9a163-2cd7-4c64-b07b-b68a417cfcdc" />
@@ -55,16 +62,17 @@ All options are configurable from the Extensions panel:
 - Toggle: dimensions, computed styles, CSS variables, box model
 - Click Lock - pin tooltip before copying (prevents accidental copies)
 - Toast notifications - show or hide copy confirmations
+- Phone Mode - toggle device preview and pick a device width
 - Reset Position - snap the FAB back to its default location
 
 ---
 
 ## Mobile Support
 
-> [!IMPORTANT]
-> On phones, enable **"Desktop site"** (or "Request desktop site") in your mobile browser settings. The extension relies on hover and click events that are only fully available in desktop mode.
+The extension has native touch handling, so it works on phones **without** switching to desktop site mode. Tap an element to inspect it, tap again to pin, and a third tap copies the selector. The draggable FAB button also responds to touch, and page scrolling is preserved (only a stationary tap triggers inspection).
 
-Once desktop mode is active, the extension works the same as on a PC -- including the draggable FAB button and element inspection.
+> [!TIP]
+> Switching your browser to **"Desktop site"** can still help if a theme's own responsive layout hides elements you want to inspect on a narrow screen.
 
 ---
 
@@ -100,7 +108,7 @@ https://github.com/Nufahi/SillyTavern-CSSInspector
 
 - SillyTavern 1.12.0+
 - Desktop browsers: Chrome, Firefox, Edge
-- Mobile browsers: works in desktop site mode (Android Chrome, etc.)
+- Mobile browsers: native touch support (Android Chrome, etc.)
 - Compatible with all SillyTavern themes
 
 ---
